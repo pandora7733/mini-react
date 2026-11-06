@@ -1,5 +1,5 @@
 import type { HostVNode, VNode } from "./types.js";
-import type { Instance } from "./hooks.js";
+import { unmountInstance, type Instance } from "./hooks.js";
 import { createDom } from "./dom.js";
 import { diff } from "./diff.js";
 import { patch } from "./patch.js";
@@ -38,15 +38,22 @@ function scheduleUpdate(root: RootState): void {
 function performRender(root: RootState): void {
   // 1) render 단계: 컴포넌트 실행 (DOM은 건드리지 않음)
   const visited = new Set<string>();
+  const effects: Array<() => void> = [];
+  const removed: Instance[] = [];
   const next = expand(root.element, "root", {
     instances: root.instances,
     visited,
+    effects,
+    removed,
     scheduleUpdate: () => scheduleUpdate(root),
   });
 
-  // 2) 사라진 컴포넌트 정리
-  for (const path of root.instances.keys()) {
-    if (!visited.has(path)) root.instances.delete(path);
+  // 2) 사라진 컴포넌트 수집
+  for (const [path, instance] of root.instances) {
+    if (!visited.has(path)) {
+      root.instances.delete(path);
+      removed.push(instance);
+    }
   }
 
   // 3) commit 단계: DOM 반영
@@ -57,4 +64,8 @@ function performRender(root: RootState): void {
     if (p !== null) patch(root.container, root.container.firstChild ?? undefined, p);
   }
   root.prevHost = next;
+
+  // 4) effect 단계: unmount cleanup → 이번 렌더의 effect
+  for (const instance of removed) unmountInstance(instance);
+  for (const run of effects) run();
 }

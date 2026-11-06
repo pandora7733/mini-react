@@ -4,6 +4,8 @@ import { renderComponent, type Instance } from "./hooks.js";
 export interface ExpandContext {
   instances: Map<string, Instance>;
   visited: Set<string>;
+  effects: Array<() => void>;   // commit 후 실행할 effect (자식 → 부모 순)
+  removed: Instance[];          // 이번 렌더에서 사라진 인스턴스
   scheduleUpdate: () => void;
 }
 
@@ -21,7 +23,14 @@ export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNod
     case "component": {
       let instance = ctx.instances.get(path);
       if (instance === undefined || instance.type !== vnode.type) {
-        instance = { type: vnode.type, hooks: [], scheduleUpdate: ctx.scheduleUpdate };
+        if (instance !== undefined) ctx.removed.push(instance);   // 같은 자리, 다른 컴포넌트
+        instance = {
+          type: vnode.type,
+          hooks: [],
+          pendingEffects: [],
+          scheduleUpdate: ctx.scheduleUpdate,
+          unmounted: false,
+        };
         ctx.instances.set(path, instance);
       }
       ctx.visited.add(path);
@@ -30,7 +39,9 @@ export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNod
         ...vnode.props,
         children: vnode.children,
       });
-      return expand(output, `${path}/r`, ctx);
+      const host = expand(output, `${path}/r`, ctx);
+      ctx.effects.push(...instance.pendingEffects);   // 자식의 effect가 먼저 쌓인 뒤 부모
+      return host;
     }
   }
 }

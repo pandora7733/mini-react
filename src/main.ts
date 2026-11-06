@@ -1,10 +1,21 @@
 import { h } from "./createElement.js";
 import { render } from "./render.js";
-import { useState } from "./hooks.js";
+import { useEffect, useState } from "./hooks.js";
 
 function Counter({ label }: { label: string }) {
   const [count, setCount] = useState(0);
   console.log(`render ${label}`);
+
+  useEffect(() => {
+    console.log(`effect ${label}: mount`);
+    return () => console.log(`cleanup ${label}: unmount`);
+  }, []);
+
+  useEffect(() => {
+    console.log(`effect ${label}: count=${count}`);
+    return () => console.log(`cleanup ${label}: count=${count}`);
+  }, [count]);
+
   return h("div", null,
     h("span", null, label, ": ", count),
     h("button", { onClick: () => setCount(c => c + 1) }, "+1"),
@@ -15,6 +26,11 @@ function Counter({ label }: { label: string }) {
 function App() {
   const [showB, setShowB] = useState(true);
   console.log("render App");
+
+  useEffect(() => {
+    console.log("effect App: 매 렌더");
+  });
+
   return h("div", null,
     h("input", { placeholder: "입력값이 유지되는지 확인" }),
     h(Counter, { label: "A" }),
