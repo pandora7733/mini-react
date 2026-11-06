@@ -16,7 +16,13 @@ interface EffectHook {
   cleanup: (() => void) | undefined;
 }
 
-type Hook = StateHook<any> | EffectHook;
+interface MemoHook<T> {
+  tag: "memo";
+  value: T;
+  deps: Deps;
+}
+
+type Hook = StateHook<any> | EffectHook | MemoHook<any>;
 
 export interface Instance {
   type: Component;
@@ -101,6 +107,22 @@ export function useEffect(effect: EffectCallback, deps?: Deps): void {
     const cleanup = effect();
     hook.cleanup = typeof cleanup === "function" ? cleanup : undefined;
   });
+}
+
+export function useMemo<T>(factory: () => T, deps: Deps): T {
+  const { instance, index, prev } = nextHook("memo");
+
+  if (prev !== undefined && !depsChanged(prev.deps, deps)) {
+    return prev.value as T;
+  }
+
+  const hook: MemoHook<T> = { tag: "memo", value: factory(), deps };
+  instance.hooks[index] = hook;
+  return hook.value;
+}
+
+export function useCallback<F extends (...args: never[]) => unknown>(callback: F, deps: Deps): F {
+  return useMemo(() => callback, deps);
 }
 
 export function unmountInstance(instance: Instance): void {

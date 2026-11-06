@@ -1,6 +1,6 @@
 import { h } from "./createElement.js";
 import { render } from "./render.js";
-import { useEffect, useState } from "./hooks.js";
+import { useCallback, useEffect, useMemo, useState } from "./hooks.js";
 
 function Counter({ label }: { label: string }) {
   const [count, setCount] = useState(0);
@@ -16,9 +16,16 @@ function Counter({ label }: { label: string }) {
     return () => console.log(`cleanup ${label}: count=${count}`);
   }, [count]);
 
+  const doubled = useMemo(() => {
+    console.log(`memo ${label}: count * 2 계산`);
+    return count * 2;
+  }, [count]);
+
+  const increment = useCallback(() => setCount(c => c + 1), []);
+
   return h("div", null,
-    h("span", null, label, ": ", count),
-    h("button", { onClick: () => setCount(c => c + 1) }, "+1"),
+    h("span", null, label, ": ", count, " (x2 = ", doubled, ")"),
+    h("button", { onClick: increment }, "+1"),
     h("button", { onClick: () => { setCount(c => c + 1); setCount(c => c + 1); } }, "+2"),
   );
 }
