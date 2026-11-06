@@ -1,12 +1,11 @@
 export type Key = string | number;
-
 export type Props = Record<string, unknown>;
 
-export interface ElementVNode {
+interface ElementBase<C> {
   kind: "element";
   type: string;
   props: Props;
-  children: VNode[];
+  children: C[];
   key: Key | null;
 }
 
@@ -15,7 +14,23 @@ export interface TextVNode {
   value: string;
 }
 
-export type VNode = ElementVNode | TextVNode;
+export type Component<P extends object = any> = (props: P) => VNode;
+
+export interface ComponentVNode<P extends object = any> {
+  kind: "component";
+  type: Component<P>;
+  props: P;
+  children: VNode[];
+  key: Key | null;
+}
+
+// expand 전: 사용자가 h()로 만든 트리
+export type ElementVNode = ElementBase<VNode>;
+export type VNode = ElementVNode | TextVNode | ComponentVNode;
+
+// expand 후: diff/patch가 다루는 트리
+export type HostElementVNode = ElementBase<HostVNode>;
+export type HostVNode = HostElementVNode | TextVNode;
 
 export type VNodeChild =
   | VNode
@@ -32,10 +47,11 @@ export interface PropPatch {
   next: unknown;
 }
 
+// Patch의 vnode는 HostVNode로 변경
 export type Patch =
-  | { type: "CREATE"; vnode: VNode }
+  | { type: "CREATE"; vnode: HostVNode }
   | { type: "REMOVE" }
-  | { type: "REPLACE"; vnode: VNode }
+  | { type: "REPLACE"; vnode: HostVNode }
   | { type: "TEXT"; value: string }
   | { type: "UPDATE"; props: PropPatch[]; children: ChildPatch[] };
 

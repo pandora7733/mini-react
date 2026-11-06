@@ -1,22 +1,27 @@
-import type { ElementVNode, Key, Props, TextVNode, VNode, VNodeChild } from "./types.js";
+import type { Component, ComponentVNode, ElementVNode, Key, Props, TextVNode, VNode, VNodeChild } from "./types.js";
 
-type RawProps = Props & { key?: Key | null };
+type KeyProp = { key?: Key | null };
+type RawProps = Props & KeyProp;
+
+// props가 전부 optional인 컴포넌트만 null을 허용
+type ComponentProps<P> = {} extends P ? (P & KeyProp) | null : P & KeyProp;
 
 export function createElement(
-  type: string,
-  props: RawProps | null,
-  ...children: VNodeChild[]
-): ElementVNode {
-  const raw: RawProps = props ?? {};
-  const { key = null, ...rest } = raw;
+  type: string, props: RawProps | null, ...children: VNodeChild[]
+): ElementVNode;
+export function createElement<P extends object>(
+  type: Component<P>, props: ComponentProps<P>, ...children: VNodeChild[]
+): ComponentVNode<P>;
+export function createElement(
+  type: string | Component, props: object | null, ...children: VNodeChild[]
+): VNode {
+  const { key = null, ...rest } = (props ?? {}) as RawProps;
+  const normalized = normalizeChildren(children);
 
-  return {
-    kind: "element",
-    type,
-    props: rest,
-    children: normalizeChildren(children),
-    key,
-  };
+  if (typeof type === "function") {
+    return { kind: "component", type, props: rest, children: normalized, key };
+  }
+  return { kind: "element", type, props: rest, children: normalized, key };
 }
 
 export function createTextVNode(value: string): TextVNode {

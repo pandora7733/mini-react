@@ -1,9 +1,9 @@
-import { ElementVNode, TextVNode, VNode } from "./types.js";
+import type { HostElementVNode, HostVNode, TextVNode } from "./types.js";
 
 export function createDom(vnode: TextVNode): Text;
-export function createDom(vnode: ElementVNode): HTMLElement;
-export function createDom(vnode: VNode): Text | HTMLElement;
-export function createDom(vnode: VNode): Text | HTMLElement {
+export function createDom(vnode: HostElementVNode): HTMLElement;
+export function createDom(vnode: HostVNode): Text | HTMLElement;
+export function createDom(vnode: HostVNode): Text | HTMLElement {
   if (vnode.kind === "text") {
     return document.createTextNode(vnode.value);
   }
@@ -19,10 +19,6 @@ export function createDom(vnode: VNode): Text | HTMLElement {
   }
 
   return el;
-}
-
-export function render(vnode: VNode, container: HTMLElement): void {
-  container.replaceChildren(createDom(vnode));
 }
 
 type StyleObject = Record<string, string | number>;

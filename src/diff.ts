@@ -1,6 +1,6 @@
-import type { ChildPatch, Patch, PropPatch, Props, VNode } from "./types.js";
+import type { ChildPatch, HostVNode, Patch, PropPatch, Props } from "./types.js";
 
-export function diff(oldVNode: VNode | undefined, newVNode: VNode | undefined): Patch | null {
+export function diff(oldVNode: HostVNode | undefined, newVNode: HostVNode | undefined): Patch | null {
   // 1. 한쪽이 없는 경우
   if (oldVNode === undefined) {
     return newVNode === undefined ? null : { type: "CREATE", vnode: newVNode };
@@ -24,7 +24,7 @@ export function diff(oldVNode: VNode | undefined, newVNode: VNode | undefined): 
     return { type: "REPLACE", vnode: newVNode };
   }
 
-  // 여기부터 둘 다 ElementVNode로 좁혀짐
+  // 여기부터 둘 다 HostElementVNode로 좁혀짐
 
   // 5. 태그나 key가 다르면 다른 노드
   if (oldVNode.type !== newVNode.type || oldVNode.key !== newVNode.key) {
@@ -60,7 +60,7 @@ function diffProps(oldProps: Props, newProps: Props): PropPatch[] {
   return patches;
 }
 
-function diffChildren(oldChildren: VNode[], newChildren: VNode[]): ChildPatch[] {
+function diffChildren(oldChildren: HostVNode[], newChildren: HostVNode[]): ChildPatch[] {
   const patches: ChildPatch[] = [];
   const length = Math.max(oldChildren.length, newChildren.length);
 

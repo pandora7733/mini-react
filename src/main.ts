@@ -1,28 +1,31 @@
 import { h } from "./createElement.js";
 import { render } from "./render.js";
+import { useState } from "./hooks.js";
 
-const root = document.getElementById("root")!;
-let count = 0;
-
-function App() {
+function Counter({ label }: { label: string }) {
+  const [count, setCount] = useState(0);
+  console.log(`render ${label}`);
   return h("div", null,
-    h("h1", null, "count: ", count),
-    h("button", { onClick: () => { count++; update(); } }, "+1"),
-    h("input", { placeholder: "아무거나 입력해 보세요" }),
-    count % 2 === 0 ? h("p", null, "짝수") : h("b", null, "홀수"),
-    h("ul", null,
-      Array.from({ length: count }, (_, i) => h("li", null, "item ", i)),
-    ),
+    h("span", null, label, ": ", count),
+    h("button", { onClick: () => setCount(c => c + 1) }, "+1"),
+    h("button", { onClick: () => { setCount(c => c + 1); setCount(c => c + 1); } }, "+2"),
   );
 }
 
-function update() {
-  render(App(), root);
+function App() {
+  const [showB, setShowB] = useState(true);
+  console.log("render App");
+  return h("div", null,
+    h("input", { placeholder: "입력값이 유지되는지 확인" }),
+    h(Counter, { label: "A" }),
+    h("button", { onClick: () => setShowB(s => !s) }, "B 토글"),
+    showB ? h(Counter, { label: "B" }) : null,
+  );
 }
 
-update();
+render(h(App, null), document.getElementById("root")!);
 
-// 실제로 어떤 DOM 변경이 일어나는지 콘솔에 기록
-new MutationObserver(records => {
-  console.log(`DOM 변경 ${records.length}건`, records.map(r => r.type));
-}).observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+// @ts-expect-error label은 string이어야 함
+h(Counter, { label: 1 });
+// @ts-expect-error 필수 props가 있으면 null 불가
+h(Counter, null);
