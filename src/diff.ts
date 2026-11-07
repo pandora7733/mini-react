@@ -12,26 +12,32 @@ export function diff(oldVNode: HostVNode | undefined, newVNode: HostVNode | unde
   // 2. 완전히 같은 객체면 비교할 필요 없음
   if (oldVNode === newVNode) return null;
 
-  // 3. 둘 다 텍스트
+  // 3. 빈 자리: 둘 다 비었으면 변경 없음, 한쪽만 비었으면 교체
+  if (oldVNode.kind === "empty" && newVNode.kind === "empty") return null;
+  if (oldVNode.kind === "empty" || newVNode.kind === "empty") {
+    return { type: "REPLACE", vnode: newVNode };
+  }
+
+  // 4. 둘 다 텍스트
   if (oldVNode.kind === "text" && newVNode.kind === "text") {
     return oldVNode.value === newVNode.value
       ? null
       : { type: "TEXT", value: newVNode.value };
   }
 
-  // 4. 하나만 텍스트 → 종류가 다름
+  // 5. 하나만 텍스트 → 종류가 다름
   if (oldVNode.kind === "text" || newVNode.kind === "text") {
     return { type: "REPLACE", vnode: newVNode };
   }
 
   // 여기부터 둘 다 HostElementVNode로 좁혀짐
 
-  // 5. 태그나 key가 다르면 다른 노드
+  // 6. 태그나 key가 다르면 다른 노드
   if (oldVNode.type !== newVNode.type || oldVNode.key !== newVNode.key) {
     return { type: "REPLACE", vnode: newVNode };
   }
 
-  // 6. 같은 노드 → props와 children 비교
+  // 7. 같은 노드 → props와 children 비교
   const props = diffProps(oldVNode.props, newVNode.props);
   const children = diffChildren(oldVNode.children, newVNode.children);
 

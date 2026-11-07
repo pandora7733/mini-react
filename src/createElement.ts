@@ -1,4 +1,4 @@
-import type { Component, ComponentVNode, ElementVNode, Key, Props, TextVNode, VNode, VNodeChild } from "./types.js";
+import type { Component, ComponentVNode, ElementVNode, EmptyVNode, Key, Props, TextVNode, VNode, VNodeChild } from "./types.js";
 
 type KeyProp = { key?: Key | null };
 type RawProps = Props & KeyProp;
@@ -28,6 +28,8 @@ export function createTextVNode(value: string): TextVNode {
   return { kind: "text", value };
 }
 
+export const EMPTY: EmptyVNode = { kind: "empty" };
+
 function normalizeChildren(children: VNodeChild[]): VNode[] {
   const out: VNode[] = [];
   for (const child of children) {
@@ -42,7 +44,9 @@ function flatten(child: VNodeChild, out: VNode[]): void {
     return;
   }
 
+  // 제거하지 않고 빈 자리로 남겨서 뒤 형제들의 인덱스를 지킨다
   if (child === null || child === undefined || typeof child === "boolean") {
+    out.push(EMPTY);
     return;
   }
 

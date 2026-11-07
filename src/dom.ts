@@ -1,11 +1,17 @@
-import type { HostElementVNode, HostVNode, TextVNode } from "./types.js";
+import type { EmptyVNode, HostElementVNode, HostVNode, TextVNode } from "./types.js";
 
 export function createDom(vnode: TextVNode): Text;
+export function createDom(vnode: EmptyVNode): Comment;
 export function createDom(vnode: HostElementVNode): HTMLElement;
-export function createDom(vnode: HostVNode): Text | HTMLElement;
-export function createDom(vnode: HostVNode): Text | HTMLElement {
+export function createDom(vnode: HostVNode): Text | Comment | HTMLElement;
+export function createDom(vnode: HostVNode): Text | Comment | HTMLElement {
   if (vnode.kind === "text") {
     return document.createTextNode(vnode.value);
+  }
+
+  // 빈 자리도 DOM 노드 하나를 차지해야 vnode 인덱스 = childNodes 인덱스가 유지된다
+  if (vnode.kind === "empty") {
+    return document.createComment("");
   }
 
   const el = document.createElement(vnode.type);

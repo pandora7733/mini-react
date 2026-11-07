@@ -1,5 +1,6 @@
 import type { HostVNode, VNode } from "./types.js";
 import { renderComponent, type Instance } from "./hooks.js";
+import { EMPTY } from "./createElement.js";
 
 export interface ExpandContext {
   instances: Map<string, Instance>;
@@ -12,6 +13,7 @@ export interface ExpandContext {
 export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNode {
   switch (vnode.kind) {
     case "text":
+    case "empty":
       return vnode;
 
     case "element":
@@ -39,7 +41,7 @@ export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNod
         ...vnode.props,
         children: vnode.children,
       });
-      const host = expand(output, `${path}/r`, ctx);
+      const host = expand(output ?? EMPTY, `${path}/r`, ctx);   // null 반환 = 빈 자리
       ctx.effects.push(...instance.pendingEffects);   // 자식의 effect가 먼저 쌓인 뒤 부모
       return host;
     }
@@ -47,6 +49,8 @@ export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNod
 }
 
 function childPath(parent: string, child: VNode, index: number): string {
-  if (child.kind !== "text" && child.key !== null) return `${parent}/k:${child.key}`;
+  if ((child.kind === "element" || child.kind === "component") && child.key !== null) {
+    return `${parent}/k:${child.key}`;
+  }
   return `${parent}/i:${index}`;
 }

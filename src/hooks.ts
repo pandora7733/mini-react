@@ -37,7 +37,7 @@ let hookIndex = 0;
 
 export function renderComponent<P extends object>(
   instance: Instance, component: Component<P>, props: P,
-): VNode {
+): VNode | null {
   currentInstance = instance;
   hookIndex = 0;
   instance.pendingEffects = [];

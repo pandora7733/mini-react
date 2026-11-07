@@ -14,7 +14,12 @@ export interface TextVNode {
   value: string;
 }
 
-export type Component<P extends object = any> = (props: P) => VNode;
+// null/undefined/boolean 자식과 null을 반환한 컴포넌트의 "빈 자리"
+export interface EmptyVNode {
+  kind: "empty";
+}
+
+export type Component<P extends object = any> = (props: P) => VNode | null;
 
 export interface ComponentVNode<P extends object = any> {
   kind: "component";
@@ -26,11 +31,11 @@ export interface ComponentVNode<P extends object = any> {
 
 // expand 전: 사용자가 h()로 만든 트리
 export type ElementVNode = ElementBase<VNode>;
-export type VNode = ElementVNode | TextVNode | ComponentVNode;
+export type VNode = ElementVNode | TextVNode | ComponentVNode | EmptyVNode;
 
 // expand 후: diff/patch가 다루는 트리
 export type HostElementVNode = ElementBase<HostVNode>;
-export type HostVNode = HostElementVNode | TextVNode;
+export type HostVNode = HostElementVNode | TextVNode | EmptyVNode;
 
 export type VNodeChild =
   | VNode
