@@ -1,4 +1,4 @@
-import { h } from "./createElement.js";
+import { Fragment, h } from "./createElement.js";
 import { render } from "./render.js";
 import { useCallback, useEffect, useMemo, useState } from "./hooks.js";
 
@@ -79,6 +79,29 @@ function List() {
   );
 }
 
+// DOM 노드 없이 여러 개를 반환한다
+function Tags({ count }: { count: number }) {
+  return (
+    <>
+      <em>태그 {count}개:</em>
+      {Array.from({ length: count }, (_, i) => <b key={i}>#{i}</b>)}
+    </>
+  );
+}
+
+// Tags의 길이가 바뀌어도 뒤에 있는 input은 그대로여야 한다
+function FragmentDemo() {
+  const [count, setCount] = useState(1);
+  return (
+    <section>
+      <button onClick={() => setCount(c => c + 1)}>태그 추가</button>
+      <button onClick={() => setCount(c => Math.max(0, c - 1))}>태그 삭제</button>
+      <Tags count={count} />
+      <input placeholder="태그 수가 바뀌어도 유지" />
+    </section>
+  );
+}
+
 function App() {
   const [showB, setShowB] = useState(true);
   console.log("render App");
@@ -95,6 +118,7 @@ function App() {
       <button onClick={() => setShowB(s => !s)}>B 토글</button>
       <input placeholder="입력값이 유지되는지 확인" />
       <List />
+      <FragmentDemo />
     </div>
   );
 }
