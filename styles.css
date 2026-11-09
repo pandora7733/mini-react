@@ -467,6 +467,100 @@ dd {
   margin: 0;
 }
 
+/* 예시 앱: 가계부 */
+.budget-month {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+}
+
+.budget-month strong {
+  min-width: 96px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* 금액이 길어도 칸이 넓어지지 않게 하고, 그래도 넘치면 칸 안에서 줄을 바꾼다 */
+.budget-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.budget-stats dd {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.budget-chart {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.budget-chart ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.budget-chart li {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.budget-chart svg {
+  display: block;
+}
+
+.budget-amount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.budget-amount.income {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.budget-day, .budget-category {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-form input.budget-number {
+  flex: 1 1 110px;
+}
+
+.task-form input.budget-date {
+  flex: 0 1 150px;
+}
+
+.budget-edit {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.task:has(.budget-amount) {
+  flex-wrap: wrap;
+}
+
+.task:has(.budget-edit) {
+  flex-wrap: wrap;
+}
+
 /* 테스트 */
 .test-results {
   margin: 0;

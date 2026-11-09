@@ -28,6 +28,6 @@ declare namespace JSX {
     [attribute: string]: unknown;
   }
 
-  // HTML 태그 이름만 허용 (<foo>는 컴파일 에러)
-  type IntrinsicElements = Record<keyof HTMLElementTagNameMap, HostProps>;
+  // HTML과 SVG 태그 이름만 허용 (<foo>는 컴파일 에러)
+  type IntrinsicElements = Record<keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap, HostProps>;
 }

@@ -19,6 +19,7 @@ npm run serve
 |---|---|
 | `/phase1.html` | Diff 검증 페이지 |
 | `/phase2.html` | Focus Board |
+| `/budget.html` | 예시 앱: 가계부 |
 | `/tests.html` | 브라우저 단위 테스트와 기능 테스트 |
 
 ## 구조
@@ -88,6 +89,14 @@ render(<App />, root, { rootOnlyHooks: true });   // 자식이 훅을 호출하�
 2. 컴포넌트를 `dirty`로 표시합니다.
 3. 마이크로태스크로 다시 렌더를 예약합니다. 이미 예약되어 있으면 추가하지 않으므로, 한 이벤트 안의 `setState` 여러 번이 렌더 한 번으로 합쳐집니다(배칭).
 
+## 예시 앱: 가계부
+
+`src/pages/budget.tsx`는 mini-react를 라이브러리처럼 써서 만든 앱입니다. Focus Board가 루트 전용 상태 제약을 지키는 페이지라면, 이 앱은 제약 없이 쓸 때의 모습을 보여 줍니다.
+
+- **자식 컴포넌트의 자체 상태:** 입력 중인 값과 항목별 수정 모드는 `EntryForm`, `EntryRow`가 직접 가집니다. 여러 컴포넌트가 함께 쓰는 내역과 선택한 달만 루트에 둡니다.
+- **커스텀 훅:** `useStoredState`는 `useState`와 `useEffect`를 묶어 `localStorage`에 저장되는 상태를 만듭니다.
+- **그 외:** Fragment, `key`로 재사용되는 목록, SVG 막대 차트, `useMemo`로 계산한 합계.
+
 ## 개념 정리
 
 - **실제 DOM 변경이 비싼 이유:** DOM API 호출 자체보다 그 뒤의 렌더링 비용이 큽니다. 크기나 위치가 바뀌면 레이아웃을 다시 계산하고(Reflow), 다시 칠합니다(Repaint). 색처럼 모양만 바뀌면 Repaint만 일어납니다.
@@ -103,6 +112,7 @@ render(<App />, root, { rootOnlyHooks: true });   // 자식이 훅을 호출하�
 | 재조정 | 경로로 같은 자리를 찾음 | 타입과 key로 비교. 타입이 다르면 하위 전체 교체 |
 | 빈 자리 | 주석 노드를 실제로 만듦 | DOM 노드를 만들지 않음 |
 | 이벤트 | 노드마다 `addEventListener` | 루트에서 위임하는 합성 이벤트 |
+| 이벤트 이름 | 브라우저 이름을 따름 (`onKeydown`, `onChange`는 포커스가 빠질 때 발생) | 카멜 표기 (`onKeyDown`, `onChange`는 입력할 때마다 발생) |
 | 배칭 | 마이크로태스크 | 스케줄러와 우선순위(lane) |
 | `useEffect` 시점 | 커밋 직후 동기 실행 | 보통 페인트 이후 비동기 실행 |
 | 제어 컴포넌트 | 사용자 입력을 상태 값으로 되돌리지 않음 | 렌더 후 상태 값으로 되돌림 |
