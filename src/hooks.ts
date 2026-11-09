@@ -1,4 +1,5 @@
-import type { Component, ComponentVNode, VNode } from "./types.js";
+import type { Component, VNode } from "./types.js";
+import type { FunctionComponent } from "./FunctionComponent.js";
 
 type SetStateAction<S> = S | ((prev: S) => S);
 type Deps = readonly unknown[];
@@ -22,24 +23,13 @@ interface MemoHook<T> {
   deps: Deps;
 }
 
-type Hook = StateHook<any> | EffectHook | MemoHook<any>;
+export type Hook = StateHook<any> | EffectHook | MemoHook<any>;
 
-export interface Instance {
-  type: Component;
-  hooks: Hook[];
-  pendingEffects: Array<() => void>;   // 이번 렌더에서 실행이 필요한 effect
-  scheduleUpdate: () => void;
-  unmounted: boolean;
-  dirty: boolean;                  // setState가 일어나서 다시 렌더해야 한다
-  vnode: ComponentVNode | null;    // 마지막으로 렌더한 vnode (null = 다시 렌더 필요)
-  output: VNode | null;            // 마지막 렌더 결과. 렌더를 건너뛸 때 그대로 다시 쓴다
-}
-
-let currentInstance: Instance | null = null;
+let currentInstance: FunctionComponent | null = null;
 let hookIndex = 0;
 
 export function renderComponent<P extends object>(
-  instance: Instance, component: Component<P>, props: P,
+  instance: FunctionComponent, component: Component<P>, props: P,
 ): VNode | null {
   currentInstance = instance;
   hookIndex = 0;
@@ -53,7 +43,7 @@ export function renderComponent<P extends object>(
 }
 
 function nextHook<T extends Hook["tag"]>(tag: T): {
-  instance: Instance;
+  instance: FunctionComponent;
   index: number;
   prev: Extract<Hook, { tag: T }> | undefined;
 } {
@@ -61,6 +51,9 @@ function nextHook<T extends Hook["tag"]>(tag: T): {
     throw new Error("훅은 컴포넌트가 렌더링되는 중에만 호출할 수 있습니다");
   }
   const instance = currentInstance;
+  if (!instance.hooksAllowed) {
+    throw new Error(`rootOnlyHooks 모드에서는 루트 컴포넌트만 훅을 쓸 수 있습니다: ${instance.type.name}`);
+  }
   const index = hookIndex++;
   const prev = instance.hooks[index];
   if (prev !== undefined && prev.tag !== tag) {
@@ -127,16 +120,6 @@ export function useMemo<T>(factory: () => T, deps: Deps): T {
 
 export function useCallback<F extends (...args: never[]) => unknown>(callback: F, deps: Deps): F {
   return useMemo(() => callback, deps);
-}
-
-export function unmountInstance(instance: Instance): void {
-  instance.unmounted = true;
-  for (const hook of instance.hooks) {
-    if (hook.tag === "effect") {
-      hook.cleanup?.();
-      hook.cleanup = undefined;
-    }
-  }
 }
 
 function depsChanged(prev: Deps | undefined, next: Deps | undefined): boolean {

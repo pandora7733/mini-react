@@ -12,7 +12,7 @@ export function patchChildren(parent: Node, { removed, order }: ChildrenPatch): 
   order.forEach((child, i) => {
     let node: ChildNode;
     if (child.type === "INSERT") {
-      node = createDom(child.vnode);
+      node = createDom(child.vnode, parent);
     } else {
       node = requireNode(oldNodes[child.from]);
       if (child.patch !== null) patchNode(node, child.patch);
@@ -33,12 +33,13 @@ function patchNode(node: ChildNode, p: Patch): void {
     }
 
     case "UPDATE": {
-      if (!(node instanceof HTMLElement)) throw new Error("UPDATE patch의 대상이 엘리먼트가 아닙니다");
+      if (!(node instanceof Element)) throw new Error("UPDATE patch의 대상이 엘리먼트가 아닙니다");
 
+      // <select>의 value는 새 <option>이 붙은 뒤에 적용해야 하므로 자식을 먼저 고친다
+      patchChildren(node, p.children);
       for (const { name, prev, next } of p.props) {
         patchProp(node, name, prev, next);
       }
-      patchChildren(node, p.children);
       return;
     }
 

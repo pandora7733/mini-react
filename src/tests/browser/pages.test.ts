@@ -1,0 +1,386 @@
+import { assert, test, wait } from "./harness.js";
+
+// 실제 페이지를 iframe으로 열어 사용자처럼 조작하는 기능 테스트
+async function openPage(url: string): Promise<{ doc: Document; win: Window & typeof globalThis; frame: HTMLIFrameElement }> {
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position: fixed; left: -2000px; width: 1000px; height: 800px";
+  frame.src = url;
+  document.body.append(frame);
+  await waitForReady(frame);
+  return {
+    frame,
+    doc: frame.contentDocument!,
+    win: frame.contentWindow as Window & typeof globalThis,
+  };
+}
+
+async function waitForReady(frame: HTMLIFrameElement): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    if (frame.contentDocument?.body?.dataset.ready === "true") return;
+    await wait(10);
+  }
+  throw new Error(`페이지를 열지 못했습니다: ${frame.src}`);
+}
+
+function typeInto(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  el.value = value;
+  el.dispatchEvent(new (el.ownerDocument.defaultView as Window & typeof globalThis).Event("input", { bubbles: true }));
+}
+
+function $<T extends HTMLElement>(doc: Document, selector: string): T {
+  const el = doc.querySelector<T>(selector);
+  if (el === null) throw new Error(`${selector}를 찾을 수 없습니다`);
+  return el;
+}
+
+// --- Phase 1 ---
+
+async function phase1() {
+  const page = await openPage("./phase1.html");
+  const { doc } = page;
+  const real = $(doc, "#real-area");
+  const testArea = $(doc, "#test-area");
+  const source = $<HTMLTextAreaElement>(doc, "#source");
+  return {
+    ...page,
+    real,
+    testArea,
+    source,
+    patch: () => $(doc, "#patch-btn").click(),
+    back: () => $(doc, "#back-btn").click(),
+    forward: () => $(doc, "#forward-btn").click(),
+    status: () => $(doc, "#status").textContent ?? "",
+    metric: () => $(doc, "#metric").textContent ?? "",
+    historyCount: () => doc.querySelectorAll("#history-list li").length,
+    logKinds: () => Array.from(doc.querySelectorAll<HTMLElement>("#change-log li"), li => li.dataset.kind),
+    scenario: async (name: string) => {
+      $(doc, `[data-scenario="${name}"]`).click();
+      await wait();
+    },
+    close: () => page.frame.remove(),
+  };
+}
+
+test("Phase 1: 로드하면 실제 영역을 변환해 테스트 영역을 그린다", async () => {
+  const p = await phase1();
+  assert.equal(p.testArea.innerHTML, p.real.innerHTML);
+  assert.equal(p.source.value, p.testArea.innerHTML);
+  assert.equal(p.historyCount(), 1);
+  assert.equal($<HTMLButtonElement>(p.doc, "#back-btn").disabled, true);
+  assert.equal($<HTMLButtonElement>(p.doc, "#forward-btn").disabled, true);
+  p.close();
+});
+
+test("Phase 1: 변경 없이 Patch하면 기록을 남기지 않는다", async () => {
+  const p = await phase1();
+  p.patch();
+  assert.equal(p.historyCount(), 1);
+  assert.ok(p.status().includes("바꿀 것이 없습니다"), p.status());
+  p.close();
+});
+
+test("Phase 1: 텍스트 하나를 고치면 실제 DOM 변경도 한 건이고 다른 노드는 유지된다", async () => {
+  const p = await phase1();
+  const heading = $(p.real.ownerDocument, "#real-area h3");
+  const list = $(p.real.ownerDocument, "#real-area ul");
+  await p.scenario("text");
+  p.patch();
+  assert.equal(p.real.querySelector("h3"), heading);
+  assert.equal(p.real.querySelector("ul"), list);
+  assert.equal(heading.textContent, p.testArea.querySelector("h3")!.textContent);
+  assert.ok(p.metric().startsWith("실제 DOM 변경 1건"), p.metric());
+  assert.equal(p.logKinds().join(), "TEXT");
+  assert.equal(p.historyCount(), 2);
+  p.close();
+});
+
+test("Phase 1: 다섯 가지 변경과 이동을 찾아 실제 영역에 반영한다", async () => {
+  const p = await phase1();
+  const expected: Array<[string, string]> = [
+    ["text", "TEXT"],
+    ["attr", "ATTR"],
+    ["add", "ADD"],
+    ["remove", "REMOVE"],
+    ["replace", "REPLACE"],
+    ["move", "MOVE"],
+  ];
+  for (const [scenario, kind] of expected) {
+    await p.scenario(scenario);
+    p.patch();
+    assert.equal(p.logKinds().join(), kind, `${scenario}:`);
+    assert.equal(p.real.innerHTML, p.testArea.innerHTML, `${scenario}:`);
+  }
+  assert.equal(p.historyCount(), 7);
+  p.close();
+});
+
+test("Phase 1: HTML 코드를 고쳐서 Patch할 수 있다", async () => {
+  const p = await phase1();
+  typeInto(p.source, `<section title="t"><h4>새 내용</h4></section>`);
+  await wait();
+  assert.equal(p.testArea.querySelector("h4")!.textContent, "새 내용");
+  p.patch();
+  assert.equal(p.real.innerHTML, `<section title="t"><h4>새 내용</h4></section>`);
+  p.close();
+});
+
+test("Phase 1: 뒤로가기와 앞으로가기가 두 영역을 함께 바꾼다", async () => {
+  const p = await phase1();
+  const initial = p.real.innerHTML;
+  const heading = p.real.querySelector("h3");
+
+  await p.scenario("text");
+  p.patch();
+  const edited = p.real.innerHTML;
+  assert.ok(edited !== initial);
+
+  p.back();
+  await wait();
+  assert.equal(p.real.innerHTML, initial);
+  assert.equal(p.testArea.innerHTML, initial);
+  assert.equal(p.source.value, initial);
+  assert.equal(p.real.querySelector("h3"), heading, "이동도 patch로 처리해야 합니다.");
+  assert.equal($<HTMLButtonElement>(p.doc, "#back-btn").disabled, true);
+
+  p.forward();
+  await wait();
+  assert.equal(p.real.innerHTML, edited);
+  assert.equal(p.testArea.innerHTML, edited);
+  assert.equal($<HTMLButtonElement>(p.doc, "#forward-btn").disabled, true);
+  p.close();
+});
+
+test("Phase 1: 기록 목록에서 원하는 시점으로 바로 이동한다", async () => {
+  const p = await phase1();
+  const initial = p.real.innerHTML;
+  await p.scenario("text");
+  p.patch();
+  await p.scenario("add");
+  p.patch();
+  p.doc.querySelector<HTMLButtonElement>("#history-list li:first-child button")!.click();
+  await wait();
+  assert.equal(p.real.innerHTML, initial);
+  p.close();
+});
+
+test("Phase 1: 과거에서 새로 Patch하면 앞쪽 기록을 버린다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  p.patch();
+  await p.scenario("add");
+  p.patch();
+  p.back();
+  await wait();
+  await p.scenario("remove");
+  p.patch();
+  assert.equal(p.historyCount(), 3);
+  assert.equal($<HTMLButtonElement>(p.doc, "#forward-btn").disabled, true);
+  p.close();
+});
+
+test("Phase 1: 입력창에 타이핑한 값과 체크 상태도 반영한다", async () => {
+  const p = await phase1();
+  p.testArea.querySelector<HTMLInputElement>("input[type=text]")!.value = "타이핑";
+  p.testArea.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked = false;
+  p.patch();
+  assert.equal(p.real.querySelector<HTMLInputElement>("input[type=text]")!.value, "타이핑");
+  assert.equal(p.real.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked, false);
+
+  p.back();
+  await wait();
+  assert.equal(p.real.querySelector<HTMLInputElement>("input[type=text]")!.value, "입력값도 비교합니다");
+  assert.equal(p.testArea.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked, true);
+  p.close();
+});
+
+test("Phase 1: key가 중복되면 에러를 보여 주고 실제 영역을 바꾸지 않는다", async () => {
+  const p = await phase1();
+  const before = p.real.innerHTML;
+  typeInto(p.source, `<ul><li data-key="a"></li><li data-key="a"></li></ul>`);
+  await wait();
+  assert.ok(p.status().includes("중복"), p.status());
+  p.patch();
+  assert.equal(p.real.innerHTML, before);
+  assert.equal(p.historyCount(), 1);
+  p.close();
+});
+
+test("Phase 1: 입력한 HTML의 스크립트와 핸들러를 실행하지 않는다", async () => {
+  const p = await phase1();
+  const win = p.win as unknown as { pwned?: boolean };
+  typeInto(p.source, `<img src="missing.png" onerror="window.pwned = true"><script>window.pwned = true</script>`);
+  await wait();
+  p.patch();
+  await wait(100);
+  assert.equal(win.pwned, undefined);
+  p.close();
+});
+
+test("Phase 1: 다양한 태그를 비우고 다시 채울 수 있다", async () => {
+  const p = await phase1();
+  typeInto(p.source, "");
+  await wait();
+  p.patch();
+  assert.equal(p.real.childNodes.length, 0);
+
+  const html = `<table><tbody><tr><td>칸</td></tr></tbody></table><svg viewBox="0 0 10 10"><circle r="5"></circle></svg><select><option value="a">a</option></select><!---->`;
+  typeInto(p.source, html);
+  await wait();
+  p.patch();
+  assert.equal(p.real.innerHTML, html);
+  assert.equal(p.real.querySelector("circle")!.namespaceURI, "http://www.w3.org/2000/svg");
+  p.close();
+});
+
+// --- Phase 2 ---
+
+async function phase2() {
+  localStorage.removeItem("mini-react:focus-board:e2e");
+  const page = await openPage("./phase2.html?board=e2e");
+  const { doc } = page;
+  return {
+    ...page,
+    draft: () => $<HTMLInputElement>(doc, "#task-draft"),
+    number: (id: string) => Number($(doc, `#${id}`).textContent),
+    titles: () => Array.from(doc.querySelectorAll(".task-title"), el => el.textContent),
+    add: async (title: string) => {
+      typeInto($<HTMLInputElement>(doc, "#task-draft"), title);
+      await wait();
+      $(doc, "#task-add").click();
+      await wait();
+    },
+    close: () => {
+      page.frame.remove();
+      localStorage.removeItem("mini-react:focus-board:e2e");
+    },
+  };
+}
+
+test("Phase 2: 할 일을 추가하면 입력창이 비고 통계가 갱신된다", async () => {
+  const p = await phase2();
+  const input = p.draft();
+  await p.add("새 할 일");
+  assert.equal(p.titles().at(-1), "새 할 일");
+  assert.equal(p.number("stat-total"), 4);
+  assert.equal(p.draft(), input, "입력창은 같은 노드여야 합니다.");
+  assert.equal(input.value, "");
+  p.close();
+});
+
+test("Phase 2: 빈 제목은 추가할 수 없다", async () => {
+  const p = await phase2();
+  typeInto(p.draft(), "   ");
+  await wait();
+  assert.equal($<HTMLButtonElement>(p.doc, "#task-add").disabled, true);
+  p.close();
+});
+
+test("Phase 2: 한 이벤트의 여러 setState는 렌더 한 번으로 합쳐진다", async () => {
+  const p = await phase2();
+  typeInto(p.draft(), "배치");
+  await wait();
+  const before = p.number("engine-renders");
+  $(p.doc, "#task-add").click();
+  await wait();
+  assert.equal(p.number("engine-renders"), before + 1);
+  p.close();
+});
+
+test("Phase 2: 체크하면 완료 상태와 통계가 바뀐다", async () => {
+  const p = await phase2();
+  const row = p.doc.querySelector<HTMLElement>('[data-task-id="2"]')!;
+  row.querySelector<HTMLInputElement>("input")!.click();
+  await wait();
+  assert.equal(p.doc.querySelector('[data-task-id="2"]'), row);
+  assert.ok(row.classList.contains("done"));
+  assert.equal(p.number("stat-done"), 2);
+  assert.equal(p.number("stat-high"), 0);
+  p.close();
+});
+
+test("Phase 2: 순서를 바꾸면 key로 같은 DOM 노드를 옮긴다", async () => {
+  const p = await phase2();
+  const row = p.doc.querySelector<HTMLElement>('[data-task-id="1"]')!;
+  row.querySelector<HTMLButtonElement>('[data-action="down"]')!.click();
+  await wait();
+  assert.equal(p.titles()[1], "Virtual DOM 구조 설명 정리");
+  assert.equal(p.doc.querySelector('[data-task-id="1"]'), row);
+  p.close();
+});
+
+test("Phase 2: 삭제와 완료 항목 정리", async () => {
+  const p = await phase2();
+  p.doc.querySelector<HTMLButtonElement>('[data-task-id="3"] [data-action="remove"]')!.click();
+  await wait();
+  assert.equal(p.number("stat-total"), 2);
+  $(p.doc, "#clear-done").click();
+  await wait();
+  assert.equal(p.number("stat-total"), 1);
+  assert.equal($<HTMLButtonElement>(p.doc, "#clear-done").disabled, true);
+  p.close();
+});
+
+test("Phase 2: 필터와 검색, 결과가 없을 때의 안내", async () => {
+  const p = await phase2();
+  $(p.doc, '[data-filter="done"]').click();
+  await wait();
+  assert.equal(p.titles().length, 1);
+
+  $(p.doc, '[data-filter="all"]').click();
+  await wait();
+  const search = $<HTMLInputElement>(p.doc, "#task-search");
+  typeInto(search, "React");
+  await wait();
+  assert.equal(p.titles().length, 1);
+  assert.equal($(p.doc, "#task-search"), search, "검색창은 같은 노드여야 합니다.");
+
+  typeInto(search, "없는 검색어");
+  await wait();
+  assert.equal(p.titles().length, 0);
+  assert.ok(p.doc.querySelector("#empty-state") !== null);
+  p.close();
+});
+
+test("Phase 2: 중요도 select는 제어 컴포넌트로 동작하고 추가 후 초기화된다", async () => {
+  const p = await phase2();
+  const select = $<HTMLSelectElement>(p.doc, "#task-priority");
+  select.value = "high";
+  select.dispatchEvent(new (p.win as Window & typeof globalThis).Event("change", { bubbles: true }));
+  await wait();
+  await p.add("중요한 일");
+  assert.equal(select.value, "normal");
+  assert.equal(p.number("stat-high"), 2);
+  p.close();
+});
+
+test("Phase 2: 타이머 틱은 다시 렌더하지만 useMemo는 다시 계산하지 않고 DOM 변경도 적다", async () => {
+  const p = await phase2();
+  const memos = p.number("engine-memos");
+  const renders = p.number("engine-renders");
+  $(p.doc, "#timer-toggle").click();
+  await wait(1200);
+  $(p.doc, "#timer-toggle").click();
+  await wait();
+  assert.equal($(p.doc, "#timer-time").textContent, "24:59");
+  assert.ok(p.number("engine-renders") > renders);
+  assert.equal(p.number("engine-memos"), memos);
+
+  $(p.doc, "#timer-toggle").click();
+  await wait();
+  $(p.doc, "#timer-reset").click();
+  await wait();
+  assert.equal($(p.doc, "#timer-time").textContent, "25:00");
+  assert.ok(p.number("engine-mutations") <= 4, `DOM 변경 ${p.number("engine-mutations")}건`);
+  p.close();
+});
+
+test("Phase 2: 다시 열어도 할 일이 저장되어 있다", async () => {
+  const p = await phase2();
+  await p.add("저장 확인");
+  p.frame.contentWindow!.location.reload();
+  await wait(50);
+  await waitForReady(p.frame);
+  const titles = Array.from(p.frame.contentDocument!.querySelectorAll(".task-title"), el => el.textContent);
+  assert.equal(titles.at(-1), "저장 확인");
+  p.close();
+});

@@ -69,7 +69,7 @@ function diffProps(oldProps: Props, newProps: Props): PropPatch[] {
   return patches;
 }
 
-function isUnchanged(children: ChildrenPatch): boolean {
+export function isUnchanged(children: ChildrenPatch): boolean {
   return children.removed.length === 0
     && children.order.every((c, i) => c.type === "REUSE" && c.from === i && c.patch === null);
 }
