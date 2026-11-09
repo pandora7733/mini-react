@@ -41,11 +41,18 @@ async function phase1() {
   const real = $(doc, "#real-area");
   const testArea = $(doc, "#test-area");
   const source = $<HTMLTextAreaElement>(doc, "#source");
+  // 실제 대화상자는 테스트를 멈추므로 호출 횟수를 세고 답을 정해 둔다
+  const dialog = { asked: 0, answer: false };
+  page.win.confirm = () => {
+    dialog.asked++;
+    return dialog.answer;
+  };
   return {
     ...page,
     real,
     testArea,
     source,
+    dialog,
     patch: () => $(doc, "#patch-btn").click(),
     back: () => $(doc, "#back-btn").click(),
     forward: () => $(doc, "#forward-btn").click(),
@@ -232,7 +239,165 @@ test("Phase 1: 다양한 태그를 비우고 다시 채울 수 있다", async ()
   p.close();
 });
 
+const FORM_HTML = `<textarea>처음</textarea><select><option value="a">a</option><option value="b">b</option></select><input value="c"><input type="checkbox">`;
+
+async function editForm(p: Awaited<ReturnType<typeof phase1>>): Promise<void> {
+  typeInto(p.testArea.querySelector("textarea")!, "수정");
+  typeInto(p.testArea.querySelector<HTMLInputElement>("input:not([type])")!, "타이핑");
+  p.testArea.querySelector<HTMLInputElement>("input[type=checkbox]")!.click();
+  const select = p.testArea.querySelector("select")!;
+  select.value = "b";
+  select.dispatchEvent(new (p.win as Window & typeof globalThis).Event("input", { bubbles: true }));
+  await wait();
+}
+
+test("Phase 1: 테스트 영역의 폼 입력값이 HTML 코드에 나타난다", async () => {
+  const p = await phase1();
+  typeInto(p.source, FORM_HTML);
+  await wait();
+  await editForm(p);
+  const parsed = new DOMParser().parseFromString(p.source.value, "text/html");
+  assert.equal(parsed.querySelector("textarea")!.value, "수정");
+  assert.equal(parsed.querySelector("select")!.value, "b");
+  assert.equal(parsed.querySelector<HTMLInputElement>("input:not([type])")!.value, "타이핑");
+  assert.equal(parsed.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked, true);
+  p.close();
+});
+
+test("Phase 1: HTML 코드를 이어서 고쳐도 폼 입력값이 사라지지 않는다", async () => {
+  const p = await phase1();
+  typeInto(p.source, FORM_HTML);
+  await wait();
+  await editForm(p);
+  typeInto(p.source, `${p.source.value}<p>추가</p>`);
+  await wait();
+  p.patch();
+  assert.equal(p.real.querySelector("textarea")!.value, "수정");
+  assert.equal(p.real.querySelector("select")!.value, "b");
+  assert.equal(p.real.querySelector<HTMLInputElement>("input:not([type])")!.value, "타이핑");
+  assert.equal(p.real.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked, true);
+  assert.equal(p.real.querySelector("p")!.textContent, "추가");
+  p.close();
+});
+
+test("Phase 1: 뒤로 가면 폼 입력값도 HTML 코드에 함께 돌아온다", async () => {
+  const p = await phase1();
+  typeInto(p.source, FORM_HTML);
+  await wait();
+  p.patch();
+  await editForm(p);
+  p.patch();
+  const edited = p.source.value;
+  p.back();
+  await wait();
+  p.forward();
+  await wait();
+  assert.equal(p.source.value, edited);
+  assert.equal(p.dialog.asked, 0);
+  p.close();
+});
+
+test("Phase 1: 적용하지 않은 편집이 없으면 묻지 않고 이동한다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  p.patch();
+  p.back();
+  await wait();
+  p.forward();
+  await wait();
+  assert.equal(p.dialog.asked, 0);
+  p.close();
+});
+
+test("Phase 1: 적용하지 않은 편집이 있으면 이동 전에 묻고, 취소하면 편집을 유지한다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  p.patch();
+  const realBefore = p.real.innerHTML;
+  await p.scenario("add");
+  const draft = p.testArea.innerHTML;
+
+  p.back();
+  await wait();
+  assert.equal(p.dialog.asked, 1);
+  assert.equal(p.real.innerHTML, realBefore);
+  assert.equal(p.testArea.innerHTML, draft);
+  assert.equal($<HTMLButtonElement>(p.doc, "#forward-btn").disabled, true);
+
+  p.doc.querySelector<HTMLButtonElement>("#history-list li:first-child button")!.click();
+  await wait();
+  assert.equal(p.dialog.asked, 2);
+  assert.equal(p.testArea.innerHTML, draft);
+
+  p.dialog.answer = true;
+  p.back();
+  await wait();
+  assert.equal(p.dialog.asked, 3);
+  assert.ok(p.real.innerHTML !== realBefore);
+  assert.equal(p.testArea.innerHTML, p.real.innerHTML);
+  p.close();
+});
+
+test("Phase 1: 편집을 되돌려 처음과 같아지면 묻지 않는다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  p.patch();
+  const heading = p.testArea.querySelector("h3")!;
+  const title = heading.textContent;
+  heading.textContent = "잠시 고침";
+  await wait();
+  heading.textContent = title;
+  await wait();
+  p.back();
+  await wait();
+  assert.equal(p.dialog.asked, 0);
+  p.close();
+});
+
+test("Phase 1: HTML 코드에 오류가 남아 있어도 이동 전에 묻는다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  p.patch();
+  typeInto(p.source, `<ul><li data-key="a"></li><li data-key="a"></li></ul>`);
+  await wait();
+  p.back();
+  await wait();
+  assert.equal(p.dialog.asked, 1);
+  assert.ok(p.source.value.includes("data-key"));
+  p.close();
+});
+
 // --- Phase 2 ---
+
+const E2E_STORAGE_KEY = "mini-react:focus-board:e2e";
+const INVALID_STORAGE: Array<[string, string]> = [
+  ["객체", "{}"],
+  ["null", "null"],
+  ["객체가 아닌 항목", "[1]"],
+  ["필드가 빠진 항목", `[{"id":1}]`],
+  ["잘못된 중요도", `[{"id":1,"title":"a","priority":"low","done":false}]`],
+  ["중복 id", `[{"id":1,"title":"a","priority":"normal","done":false},{"id":1,"title":"b","priority":"normal","done":false}]`],
+  ["깨진 JSON", "{"],
+];
+
+for (const [name, saved] of INVALID_STORAGE) {
+  test(`Phase 2: 저장된 값이 잘못되면 기본 목록으로 시작한다 (${name})`, async () => {
+    localStorage.setItem(E2E_STORAGE_KEY, saved);
+    const page = await openPage("./phase2.html?board=e2e");
+    assert.equal(page.doc.querySelectorAll(".task-title").length, 3);
+    page.frame.remove();
+    localStorage.removeItem(E2E_STORAGE_KEY);
+  });
+}
+
+test("Phase 2: 저장된 빈 목록은 그대로 빈 목록이다", async () => {
+  localStorage.setItem(E2E_STORAGE_KEY, "[]");
+  const page = await openPage("./phase2.html?board=e2e");
+  assert.equal(page.doc.querySelectorAll(".task-title").length, 0);
+  assert.ok(page.doc.querySelector("#empty-state") !== null);
+  page.frame.remove();
+  localStorage.removeItem(E2E_STORAGE_KEY);
+});
 
 async function phase2() {
   localStorage.removeItem("mini-react:focus-board:e2e");

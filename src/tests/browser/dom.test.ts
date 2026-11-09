@@ -4,8 +4,9 @@ import { diffChildren } from "../../diff.js";
 import { domChildrenToVNodes, domToVNode } from "../../domToVNode.js";
 import { toHostTree } from "../../expand.js";
 import { patchChildren } from "../../patch.js";
+import { serializeHtml } from "../../serializeHtml.js";
 import type { ElementVNode, VNode } from "../../types.js";
-import { assert, test } from "./harness.js";
+import { assert, test, wait } from "./harness.js";
 
 function parse(html: string): HTMLElement {
   const host = document.createElement("div");
@@ -91,6 +92,74 @@ test("변환 후 다시 그리면 같은 HTML이 된다", () => {
 test("변환: 대소문자가 중요한 SVG 태그를 유지한다", () => {
   const vnode = domToVNode(parse(`<svg><linearGradient></linearGradient></svg>`).firstChild!) as ElementVNode;
   assert.equal((vnode.children[0] as ElementVNode).type, "linearGradient");
+});
+
+// --- HTML 직렬화 ---
+
+function reparse(html: string): HTMLTemplateElement {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return template;
+}
+
+test("직렬화: 입력값이 없으면 innerHTML과 같다", () => {
+  const host = parse(`<p class="a">글</p><!-- 주석 --><input value="a"><input type="checkbox" checked=""><textarea>t</textarea><select><option>x</option><option selected="">y</option></select>`);
+  assert.equal(serializeHtml(host), host.innerHTML);
+});
+
+test("직렬화: 처음 option이 기본 선택이면 selected 속성을 만들지 않는다", () => {
+  const host = parse(`<select><option>x</option><option>y</option></select>`);
+  assert.equal(serializeHtml(host), host.innerHTML);
+});
+
+test("직렬화: 입력한 값을 다시 파싱해도 같은 값이다", () => {
+  const host = parse(`<input value="a"><input><input type="checkbox" checked=""><input type="radio"><textarea>t</textarea><select><option>x</option><option selected="">y</option></select>`);
+  const [text, empty, box, radio, area, select] = Array.from(host.children) as [HTMLInputElement, HTMLInputElement, HTMLInputElement, HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement];
+  text.value = "";
+  empty.value = `"따옴표" <태그>`;
+  box.checked = false;
+  radio.checked = true;
+  area.value = "</textarea><b>글</b>";
+  select.selectedIndex = 0;
+
+  const out = reparse(serializeHtml(host)).content;
+  const [text2, empty2, box2, radio2, area2, select2] = Array.from(out.children) as [HTMLInputElement, HTMLInputElement, HTMLInputElement, HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement];
+  assert.equal(text2.value, "");
+  assert.equal(empty2.value, `"따옴표" <태그>`);
+  assert.equal(box2.checked, false);
+  assert.equal(radio2.checked, true);
+  assert.equal(area2.value, "</textarea><b>글</b>");
+  assert.equal(select2.value, "x");
+});
+
+test("직렬화: textarea 맨 앞의 줄바꿈을 유지한다", () => {
+  const host = parse(`<textarea></textarea>`);
+  (host.firstChild as HTMLTextAreaElement).value = "\n둘째 줄";
+  const area = reparse(serializeHtml(host)).content.firstChild as HTMLTextAreaElement;
+  assert.equal(area.value, "\n둘째 줄");
+});
+
+test("직렬화: 원본 DOM을 바꾸지 않는다", () => {
+  const host = parse(`<input value="a"><textarea>t</textarea>`);
+  const [input, area] = Array.from(host.children) as [HTMLInputElement, HTMLTextAreaElement];
+  input.value = "입력";
+  area.value = "수정";
+  const before = host.innerHTML;
+  serializeHtml(host);
+  assert.equal(host.innerHTML, before);
+  assert.equal(input.value, "입력");
+  assert.equal(area.value, "수정");
+});
+
+test("직렬화: 복사할 때 인라인 핸들러를 실행하지 않는다", async () => {
+  const win = window as unknown as { imageErrors?: number };
+  // 원본 이미지도 문서에 들어오면 한 번 실패하므로, 그 뒤로 횟수가 늘지 않는지 본다
+  const host = parse(`<img src="missing.png" onerror="window.imageErrors = (window.imageErrors ?? 0) + 1">`);
+  await wait(100);
+  assert.equal(win.imageErrors, 1);
+  serializeHtml(host);
+  await wait(100);
+  assert.equal(win.imageErrors, 1);
 });
 
 // --- 속성 ---

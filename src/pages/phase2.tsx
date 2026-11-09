@@ -28,10 +28,27 @@ const DEFAULT_TASKS: Task[] = [
 function loadTasks(): Task[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === null ? DEFAULT_TASKS : JSON.parse(saved);
+    if (saved === null) return DEFAULT_TASKS;
+    const parsed: unknown = JSON.parse(saved);
+    return isTaskList(parsed) ? parsed : DEFAULT_TASKS;
   } catch {
     return DEFAULT_TASKS;   // 저장소를 쓸 수 없거나 내용이 깨졌으면 기본값으로 시작한다
   }
+}
+
+// 저장소는 밖에서 고칠 수 있으므로 타입을 믿지 않는다. id는 key로 쓰이므로 겹치면 렌더가 실패한다
+function isTaskList(value: unknown): value is Task[] {
+  if (!Array.isArray(value) || !value.every(isTask)) return false;
+  return new Set(value.map(task => task.id)).size === value.length;
+}
+
+function isTask(value: unknown): value is Task {
+  if (typeof value !== "object" || value === null) return false;
+  const task = value as Record<string, unknown>;
+  return typeof task.id === "number"
+    && typeof task.title === "string"
+    && (task.priority === "high" || task.priority === "normal")
+    && typeof task.done === "boolean";
 }
 
 function saveTasks(tasks: Task[]): void {

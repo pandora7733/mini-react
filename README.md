@@ -33,6 +33,7 @@ h(App)  ──expand──▶  HostVNode[]  ──diffChildren──▶  Childre
 | `src/types.ts` | VNode, HostVNode, Patch 타입 |
 | `src/createElement.ts` | `h()`, JSX가 컴파일되는 함수 |
 | `src/domToVNode.ts` | 실제 DOM → Virtual DOM 변환 |
+| `src/serializeHtml.ts` | 입력값까지 담아 DOM을 HTML 문자열로 변환 |
 | `src/expand.ts` | 컴포넌트를 실행해 DOM 노드만 남은 트리로 펼치고, 경로를 `slot`으로 붙임 |
 | `src/diff.ts` | 두 트리를 비교해 패치 생성 |
 | `src/patch.ts`, `src/dom.ts` | 패치를 실제 DOM에 반영 |
@@ -60,7 +61,8 @@ h(App)  ──expand──▶  HostVNode[]  ──diffChildren──▶  Childre
 ### 설계 결정
 
 - **DOM 노드와 vnode를 1:1로 대응시킵니다.** patch는 "vnode의 i번째 = DOM의 i번째"를 전제로 합니다. 그래서 공백 텍스트도 노드로 변환하고 주석은 빈 자리로 둡니다. 공백 노드에는 key가 없어 인덱스로 비교되므로, key로 항목을 옮길 때 항목 사이에 공백이 있으면 공백 노드의 변경까지 함께 기록됩니다.
-- **입력값은 속성이 아니라 property에서 읽습니다.** 사용자가 타이핑한 값은 `value` 속성에 남지 않기 때문입니다.
+- **입력값은 속성이 아니라 property에서 읽습니다.** 사용자가 타이핑한 값은 `value` 속성에 남지 않기 때문입니다. 같은 이유로 `innerHTML`에도 입력값이 빠지므로, HTML 코드 입력창에는 복사본에 입력값을 옮겨 적어 직렬화한 결과를 보여 줍니다. 원본의 `textarea` 자식을 고치면 "vnode의 i번째 = DOM의 i번째" 전제가 깨질 수 있어 복사본을 씁니다.
+- **적용하지 않은 편집은 이동 전에 확인합니다.** 테스트 영역을 현재 기록과 Diff해서 실제로 다를 때만 묻습니다. 입력했다가 되돌린 경우에는 묻지 않습니다.
 - **입력한 HTML은 `<template>`에서 파싱합니다.** 문서에 바로 넣으면 `onerror` 같은 핸들러가 실행됩니다. 변환할 때 `script`와 `on*` 속성도 뺍니다. 사용자 본인의 입력을 다루는 검증 도구를 위한 조치이고, `javascript:` 링크 등을 막는 완전한 HTML 정제 기능은 아닙니다.
 - **변화 감지에 `MutationObserver`를 씁니다.** 테스트 영역 편집을 HTML 코드에 동기화하고, 패치가 실제로 일으킨 DOM 변경 수를 셉니다.
 

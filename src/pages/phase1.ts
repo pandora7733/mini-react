@@ -4,6 +4,7 @@ import { diffChildren, isUnchanged } from "../diff.js";
 import { patchChildren } from "../patch.js";
 import { toHostTree } from "../expand.js";
 import { domChildrenToVNodes } from "../domToVNode.js";
+import { serializeHtml } from "../serializeHtml.js";
 import { describePatch, type Change, type ChangeKind } from "../describePatch.js";
 import { StateHistory } from "../history.js";
 
@@ -46,9 +47,12 @@ realObserver.observe(real, OBSERVE_ALL);
 
 // 테스트 영역을 직접 편집하면 HTML 코드 입력창에 반영한다
 const testObserver = new MutationObserver(() => {
-  source.value = testArea.innerHTML;
+  syncSource();
   showStatus("적용되지 않은 변경이 있습니다");
 });
+
+// HTML 코드에 오류가 있으면 테스트 영역에 반영되지 않으므로, 그 내용은 입력창에만 남아 있다
+let sourceHasError = false;
 
 const history = new StateHistory<Snapshot>({
   label: "초기 상태",
@@ -56,7 +60,7 @@ const history = new StateHistory<Snapshot>({
 });
 
 showTestArea(history.current.vdom);
-source.value = testArea.innerHTML;
+syncSource();
 refresh();
 showStatus("테스트 영역을 수정한 뒤 Patch를 누르세요");
 document.body.dataset.ready = "true";
@@ -71,13 +75,19 @@ source.addEventListener("input", () => {
   template.innerHTML = source.value;
   try {
     showTestArea(toHostTree(domChildrenToVNodes(template.content)));
+    sourceHasError = false;
     showStatus("적용되지 않은 변경이 있습니다");
   } catch (error) {
+    sourceHasError = true;
     showStatus(errorMessage(error), true);
   }
 });
 
-testArea.addEventListener("input", () => showStatus("적용되지 않은 변경이 있습니다"));
+// 폼 입력은 DOM 구조를 바꾸지 않아 MutationObserver에 잡히지 않는다
+testArea.addEventListener("input", () => {
+  syncSource();
+  showStatus("적용되지 않은 변경이 있습니다");
+});
 
 // 편집 중에 링크나 폼이 페이지를 떠나지 않게 막는다
 testArea.addEventListener("click", event => {
@@ -90,13 +100,25 @@ document.querySelector(".scenarios")?.addEventListener("click", event => {
   if (name !== undefined) runScenario(name);
 });
 
-function applyPatch(): void {
+function readTestArea(): HostVNode[] {
   // 편집기가 나눠 놓은 인접 텍스트 노드를 합쳐서 같은 내용이면 같은 트리가 되게 한다
   testArea.normalize();
+  return toHostTree(domChildrenToVNodes(testArea));
+}
 
+function hasUnappliedEdits(): boolean {
+  if (sourceHasError) return true;
+  try {
+    return !isUnchanged(diffChildren(history.current.vdom, readTestArea()));
+  } catch {
+    return true;   // 변환할 수 없는 편집도 잃어버리면 안 되는 내용이다
+  }
+}
+
+function applyPatch(): void {
   let next: HostVNode[];
   try {
-    next = toHostTree(domChildrenToVNodes(testArea));
+    next = readTestArea();
   } catch (error) {
     showStatus(errorMessage(error), true);
     return;
@@ -117,13 +139,15 @@ function applyPatch(): void {
 }
 
 function moveTo(index: number): void {
+  if (hasUnappliedEdits() && !confirm("적용하지 않은 변경이 있습니다. 버리고 이동할까요?")) return;
+
   const prev = history.current.vdom;
   const target = history.go(index).vdom;
   const patch = diffChildren(prev, target);
 
   commit(() => patchChildren(real, patch), describePatch(prev, patch));
   showTestArea(target);
-  source.value = testArea.innerHTML;
+  syncSource();
   refresh();
   showStatus(`기록 #${index}(으)로 이동했습니다`);
 }
@@ -139,6 +163,11 @@ function showTestArea(vdom: HostVNode[]): void {
   testObserver.disconnect();   // 프로그램이 바꾼 내용은 사용자 편집으로 취급하지 않는다
   testArea.replaceChildren(...vdom.map(vnode => createDom(vnode, testArea)));
   testObserver.observe(testArea, OBSERVE_ALL);
+}
+
+function syncSource(): void {
+  source.value = serializeHtml(testArea);
+  sourceHasError = false;
 }
 
 function runScenario(name: string): void {
