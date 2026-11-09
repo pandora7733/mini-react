@@ -38,12 +38,21 @@ export function render(element: VNode, container: HTMLElement, options: RenderOp
   performRender(root);
 }
 
+// 화면을 비우고 모든 컴포넌트의 effect cleanup을 실행한다
+export function unmount(container: HTMLElement): void {
+  const root = roots.get(container);
+  if (root === undefined) return;
+  roots.delete(container);
+  container.replaceChildren();
+  for (const instance of root.instances.values()) instance.unmount();
+}
+
 function scheduleUpdate(root: RootState): void {
   if (root.scheduled) return;
   root.scheduled = true;
   queueMicrotask(() => {
     root.scheduled = false;
-    performRender(root);
+    if (roots.get(root.container) === root) performRender(root);   // 예약 후 해제되었으면 그리지 않는다
   });
 }
 

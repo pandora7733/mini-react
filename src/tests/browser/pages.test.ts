@@ -1,5 +1,8 @@
 import { assert, test, wait } from "./harness.js";
 
+// hashchange는 별도 태스크로 발생하므로 주소를 바꾼 뒤에는 조금 더 기다린다
+const ROUTE_WAIT = 30;
+
 // 실제 페이지를 iframe으로 열어 사용자처럼 조작하는 기능 테스트
 async function openPage(url: string): Promise<{ doc: Document; win: Window & typeof globalThis; frame: HTMLIFrameElement }> {
   const frame = document.createElement("iframe");
@@ -36,7 +39,7 @@ function $<T extends HTMLElement>(doc: Document, selector: string): T {
 // --- Phase 1 ---
 
 async function phase1() {
-  const page = await openPage("./phase1.html");
+  const page = await openPage("./index.html#/phase1");
   const { doc } = page;
   const real = $(doc, "#real-area");
   const testArea = $(doc, "#test-area");
@@ -383,7 +386,7 @@ const INVALID_STORAGE: Array<[string, string]> = [
 for (const [name, saved] of INVALID_STORAGE) {
   test(`Phase 2: 저장된 값이 잘못되면 기본 목록으로 시작한다 (${name})`, async () => {
     localStorage.setItem(E2E_STORAGE_KEY, saved);
-    const page = await openPage("./phase2.html?board=e2e");
+    const page = await openPage("./index.html?board=e2e#/phase2");
     assert.equal(page.doc.querySelectorAll(".task-title").length, 3);
     page.frame.remove();
     localStorage.removeItem(E2E_STORAGE_KEY);
@@ -392,7 +395,7 @@ for (const [name, saved] of INVALID_STORAGE) {
 
 test("Phase 2: 저장된 빈 목록은 그대로 빈 목록이다", async () => {
   localStorage.setItem(E2E_STORAGE_KEY, "[]");
-  const page = await openPage("./phase2.html?board=e2e");
+  const page = await openPage("./index.html?board=e2e#/phase2");
   assert.equal(page.doc.querySelectorAll(".task-title").length, 0);
   assert.ok(page.doc.querySelector("#empty-state") !== null);
   page.frame.remove();
@@ -401,7 +404,7 @@ test("Phase 2: 저장된 빈 목록은 그대로 빈 목록이다", async () => 
 
 async function phase2() {
   localStorage.removeItem("mini-react:focus-board:e2e");
-  const page = await openPage("./phase2.html?board=e2e");
+  const page = await openPage("./index.html?board=e2e#/phase2");
   const { doc } = page;
   return {
     ...page,
@@ -539,13 +542,129 @@ test("Phase 2: 타이머 틱은 다시 렌더하지만 useMemo는 다시 계산�
   p.close();
 });
 
+// --- 라우터 ---
+
+test("라우터: Link를 누르면 문서를 다시 불러오지 않고 화면만 바꾼다", async () => {
+  const page = await openPage("./index.html?board=e2e");
+  const win = page.win as unknown as { sameDocument?: boolean };
+  win.sameDocument = true;
+  assert.ok(page.doc.querySelector(".link-list") !== null);
+
+  $(page.doc, 'a[href="#/budget"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(page.win.location.hash, "#/budget");
+  assert.ok(page.doc.querySelector("#sum-income") !== null);
+  assert.equal(page.doc.querySelector(".link-list"), null, "이전 페이지가 사라져야 합니다.");
+  assert.equal(win.sameDocument, true);
+  page.frame.remove();
+  localStorage.removeItem(BUDGET_STORAGE_KEY);
+});
+
+test("라우터: 브라우저 뒤로가기와 앞으로가기로 페이지를 오간다", async () => {
+  const page = await openPage("./index.html?board=e2e");
+  $(page.doc, 'a[href="#/phase1"]').click();
+  await wait(ROUTE_WAIT);
+  assert.ok(page.doc.querySelector("#real-area") !== null);
+
+  page.win.history.back();
+  await wait(ROUTE_WAIT);
+  assert.ok(page.doc.querySelector(".link-list") !== null);
+  assert.equal(page.doc.querySelector("#real-area"), null);
+
+  page.win.history.forward();
+  await wait(ROUTE_WAIT);
+  assert.ok(page.doc.querySelector("#real-area") !== null);
+  page.frame.remove();
+});
+
+test("라우터: 없는 경로는 안내 페이지를 보여 주고 돌아갈 수 있다", async () => {
+  const page = await openPage("./index.html#/없는/경로");
+  assert.ok(page.doc.querySelector("#not-found") !== null);
+  $(page.doc, '.back-link[href="#/"]').click();
+  await wait(ROUTE_WAIT);
+  assert.ok(page.doc.querySelector(".link-list") !== null);
+  page.frame.remove();
+});
+
+test("라우터: 주소로 바로 접속하면 파라미터를 읽는다", async () => {
+  const page = await openPage("./index.html?board=e2e#/budget/2020-03");
+  assert.equal($(page.doc, "#month-label").textContent, "2020년 3월");
+  page.frame.remove();
+  localStorage.removeItem(BUDGET_STORAGE_KEY);
+});
+
+test("라우터: 형식이 틀린 파라미터는 이번 달로 처리한다", async () => {
+  const page = await openPage("./index.html?board=e2e#/budget/abc");
+  const now = new Date();
+  assert.equal($(page.doc, "#month-label").textContent, `${now.getFullYear()}년 ${now.getMonth() + 1}월`);
+  page.frame.remove();
+  localStorage.removeItem(BUDGET_STORAGE_KEY);
+});
+
+test("라우터: 파라미터만 바뀌면 페이지를 유지하고, 뒤로가기로 이전 달에 돌아온다", async () => {
+  const p = await budget();
+  const draft = $<HTMLInputElement>(p.doc, "#entry-title");
+  const label = p.text("#month-label");
+  typeInto(draft, "입력 중");
+  await wait();
+
+  $(p.doc, "#month-prev").click();
+  await wait(ROUTE_WAIT);
+  assert.ok(p.text("#month-label") !== label);
+  assert.equal($(p.doc, "#entry-title"), draft, "같은 DOM 노드여야 합니다.");
+  assert.equal(draft.value, "입력 중");
+
+  p.win.history.back();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.text("#month-label"), label);
+  assert.equal(draft.value, "입력 중");
+  p.close();
+});
+
+test("라우터: 페이지를 떠나면 Focus Board를 정리하고, 돌아오면 처음부터 시작한다", async () => {
+  const page = await openPage("./index.html?board=e2e#/phase2");
+  localStorage.removeItem(E2E_STORAGE_KEY);
+  $(page.doc, "#timer-toggle").click();
+  await wait(1100);
+  assert.equal($(page.doc, "#timer-time").textContent, "24:59");
+
+  page.win.location.hash = "/";
+  await wait(ROUTE_WAIT);
+  assert.equal(page.doc.querySelector("#timer-time"), null);
+
+  page.win.location.hash = "/phase2";
+  await wait(ROUTE_WAIT);
+  assert.equal($(page.doc, "#timer-time").textContent, "25:00");
+  assert.equal(page.doc.querySelectorAll("#timer-time").length, 1);
+  assert.equal($(page.doc, "#engine-renders").textContent, "1");
+  page.frame.remove();
+  localStorage.removeItem(E2E_STORAGE_KEY);
+});
+
+test("라우터: Phase 1을 떠났다 돌아와도 다시 동작한다", async () => {
+  const page = await openPage("./index.html#/phase1");
+  page.win.location.hash = "/";
+  await wait(ROUTE_WAIT);
+  page.win.location.hash = "/phase1";
+  await wait(ROUTE_WAIT);
+
+  const real = $(page.doc, "#real-area");
+  const testArea = $(page.doc, "#test-area");
+  assert.equal(testArea.innerHTML, real.innerHTML);
+  $(page.doc, '[data-scenario="text"]').click();
+  await wait();
+  $(page.doc, "#patch-btn").click();
+  assert.ok($(page.doc, "#metric").textContent!.startsWith("실제 DOM 변경 1건"));
+  page.frame.remove();
+});
+
 // --- 예시 앱: 가계부 ---
 
 const BUDGET_STORAGE_KEY = "mini-react:budget:e2e";
 
 async function budget() {
   localStorage.removeItem(BUDGET_STORAGE_KEY);
-  const page = await openPage("./budget.html?board=e2e");
+  const page = await openPage("./index.html?board=e2e#/budget");
   const { doc } = page;
   const text = (selector: string) => $(doc, selector).textContent;
   return {
@@ -599,6 +718,8 @@ test("가계부: 다른 달의 항목을 추가하면 그 달로 이동한다", 
   const p = await budget();
   typeInto($<HTMLInputElement>(p.doc, "#entry-date"), "2020-03-15");
   await p.add("과거 지출", "1000");
+  await wait(ROUTE_WAIT);
+  assert.equal(p.win.location.hash, "#/budget/2020-03");
   assert.equal(p.text("#month-label"), "2020년 3월");
   assert.equal(p.titles().join(), "과거 지출");
   p.close();
@@ -655,12 +776,12 @@ test("가계부: 저장하면 반영하고 취소하면 원래 값으로 돌아�
 test("가계부: 달을 옮기면 내역과 차트가 바뀌고, 내역이 없으면 안내한다", async () => {
   const p = await budget();
   $(p.doc, "#month-prev").click();
-  await wait();
+  await wait(ROUTE_WAIT);
   assert.equal(p.titles().join(), "전기 요금,월급");
   assert.equal(p.text("#sum-expense"), "42,000원");
 
   $(p.doc, "#month-prev").click();
-  await wait();
+  await wait(ROUTE_WAIT);
   assert.equal(p.titles().length, 0);
   assert.ok(p.doc.querySelector("#empty-state") !== null);
   assert.equal(p.doc.querySelector(".budget-chart"), null);
@@ -678,7 +799,7 @@ test("가계부: 다시 열어도 저장되어 있고, 저장값이 잘못되면
   p.close();
 
   localStorage.setItem(BUDGET_STORAGE_KEY, `[{"id":1}]`);
-  const page = await openPage("./budget.html?board=e2e");
+  const page = await openPage("./index.html?board=e2e#/budget");
   assert.equal(page.doc.querySelector("#sum-income")!.textContent, "2,500,000원");
   page.frame.remove();
   localStorage.removeItem(BUDGET_STORAGE_KEY);

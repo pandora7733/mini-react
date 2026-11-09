@@ -1,6 +1,7 @@
 import { h } from "../createElement.js";
-import { render } from "../render.js";
+import { render, unmount } from "../render.js";
 import { useEffect, useMemo, useState } from "../hooks.js";
+import { Link } from "../router.js";
 
 interface Task {
   id: number;
@@ -197,9 +198,8 @@ function TaskItem({ task, canMoveUp, canMoveDown, onToggle, onMove, onRemove }: 
 let renderCount = 0;
 let memoCount = 0;
 
-const root = document.getElementById("root")!;
-const domObserver = new MutationObserver(() => {});
-domObserver.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+let root: HTMLElement;
+let domObserver: MutationObserver;
 
 function App() {
   renderCount++;
@@ -342,5 +342,39 @@ function setText(id: string, value: number): void {
   document.getElementById(id)!.textContent = String(value);
 }
 
-render(<App />, root, { rootOnlyHooks: true });
-document.body.dataset.ready = "true";
+// 명세의 "상태는 루트에만" 제약을 지키도록 라우터 아래가 아니라 별도 루트로 그린다.
+// 라우터 트리에 넣으면 App이 최상위 컴포넌트가 아니게 되어 rootOnlyHooks를 켤 수 없다
+function mountFocusBoard(container: HTMLElement): () => void {
+  renderCount = 0;
+  memoCount = 0;
+  root = container;
+  domObserver = new MutationObserver(() => {});
+  domObserver.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+  render(<App />, root, { rootOnlyHooks: true });
+
+  return () => {
+    unmount(container);   // 타이머 같은 effect를 정리한다
+    domObserver.disconnect();
+  };
+}
+
+export function Phase2Page() {
+  useEffect(() => mountFocusBoard(document.getElementById("focus-board")!), []);
+
+  return (
+    <main className="page narrow">
+      <Link className="back-link" to="/">mini-react</Link>
+      <div id="focus-board"></div>
+      {/* 렌더 트리 밖에 둔다: 이 숫자를 상태로 만들면 갱신이 다시 갱신을 부른다 */}
+      <aside className="engine" aria-label="엔진 동작 지표">
+        <h2>엔진 동작</h2>
+        <dl>
+          <div><dt>App 렌더</dt><dd id="engine-renders">0</dd></div>
+          <div><dt>useMemo 재계산</dt><dd id="engine-memos">0</dd></div>
+          <div><dt>마지막 갱신의 DOM 변경</dt><dd id="engine-mutations">0</dd></div>
+          <div><dt>전체 DOM 노드</dt><dd id="engine-nodes">0</dd></div>
+        </dl>
+      </aside>
+    </main>
+  );
+}

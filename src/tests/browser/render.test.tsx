@@ -1,5 +1,5 @@
 import { Fragment, h } from "../../createElement.js";
-import { render } from "../../render.js";
+import { render, unmount } from "../../render.js";
 import { useEffect, useMemo, useState } from "../../hooks.js";
 import { assert, test, wait } from "./harness.js";
 
@@ -8,6 +8,51 @@ function container(): HTMLElement {
   document.getElementById("sandbox")!.append(el);
   return el;
 }
+
+test("unmount: 화면을 비우고 자식까지 cleanup을 실행하며, 예약된 렌더도 취소한다", async () => {
+  const log: string[] = [];
+  let set: (n: number) => void = () => {};
+  function Child() {
+    useEffect(() => () => log.push("child"), []);
+    return <span>자식</span>;
+  }
+  function App() {
+    const [count, setCount] = useState(0);
+    set = setCount;
+    useEffect(() => () => log.push("app"), []);
+    return <div>{count}<Child /></div>;
+  }
+  const el = container();
+  render(<App />, el);
+
+  set(1);   // 렌더가 예약된 상태에서 해제한다
+  unmount(el);
+  assert.equal(el.childNodes.length, 0);
+  assert.equal(log.slice().sort().join(), "app,child");
+
+  await wait();
+  set(2);
+  await wait();
+  assert.equal(el.childNodes.length, 0);
+  assert.equal(log.length, 2, "cleanup은 한 번만 실행해야 합니다.");
+});
+
+test("unmount: 같은 컨테이너에 다시 render하면 새 상태로 시작한다", async () => {
+  function App() {
+    const [count] = useState(() => Math.random());
+    return <p>{count}</p>;
+  }
+  const el = container();
+  render(<App />, el);
+  const first = el.textContent;
+  unmount(el);
+  render(<App />, el);
+  assert.ok(el.textContent !== first);
+});
+
+test("unmount: 그린 적 없는 컨테이너는 아무 일도 하지 않는다", () => {
+  unmount(container());
+});
 
 test("render: 상태가 바뀌면 자동으로 다시 그린다", async () => {
   let set: (n: number) => void = () => {};

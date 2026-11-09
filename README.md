@@ -17,10 +17,10 @@ npm run serve
 
 | 주소 | 내용 |
 |---|---|
-| `/phase1.html` | Diff 검증 페이지 |
-| `/phase2.html` | Focus Board |
-| `/budget.html` | 예시 앱: 가계부 |
-| `/tests.html` | 브라우저 단위 테스트와 기능 테스트 |
+| `/#/phase1` | Diff 검증 페이지 |
+| `/#/phase2` | Focus Board |
+| `/#/budget`, `/#/budget/2026-11` | 예시 앱: 가계부 |
+| `/tests.html` | 브라우저 단위 테스트와 기능 테스트 (앱과 분리된 별도 문서) |
 
 ## 구조
 
@@ -40,10 +40,11 @@ h(App)  ──expand──▶  HostVNode[]  ──diffChildren──▶  Childre
 | `src/patch.ts`, `src/dom.ts` | 패치를 실제 DOM에 반영 |
 | `src/FunctionComponent.ts` | 컴포넌트 인스턴스. `hooks` 배열, `mount()`, `update()`, `unmount()` |
 | `src/hooks.ts` | `useState`, `useEffect`, `useMemo`, `useCallback` |
-| `src/render.ts` | 렌더 → 커밋 → effect 순서 제어, 배칭 |
+| `src/render.ts` | 렌더 → 커밋 → effect 순서 제어, 배칭, 루트 해제(`unmount`) |
+| `src/router.ts` | 해시 라우터: `Routes`, `Route`, `Link`, `useParams`, `useNavigate`, `useLocation` |
 | `src/history.ts` | State History |
 | `src/describePatch.ts` | 패치를 사람이 읽는 변경 내역으로 변환 |
-| `src/pages/` | Phase 1, Phase 2 페이지 |
+| `src/pages/` | 라우트 정의(`app.tsx`)와 각 페이지 |
 
 ## Phase 1
 
@@ -95,7 +96,43 @@ render(<App />, root, { rootOnlyHooks: true });   // 자식이 훅을 호출하�
 
 - **자식 컴포넌트의 자체 상태:** 입력 중인 값과 항목별 수정 모드는 `EntryForm`, `EntryRow`가 직접 가집니다. 여러 컴포넌트가 함께 쓰는 내역과 선택한 달만 루트에 둡니다.
 - **커스텀 훅:** `useStoredState`는 `useState`와 `useEffect`를 묶어 `localStorage`에 저장되는 상태를 만듭니다.
+- **라우트 파라미터:** 선택한 달은 상태가 아니라 주소(`/budget/:month?`)에 있어서, 뒤로가기와 직접 접속이 그대로 동작합니다.
 - **그 외:** Fragment, `key`로 재사용되는 목록, SVG 막대 차트, `useMemo`로 계산한 합계.
+
+## 라우터
+
+`index.html` 하나에서 경로에 따라 컴포넌트를 바꿔 그리는 SPA입니다. 라우트는 [app.tsx](src/pages/app.tsx)에서 선언합니다.
+
+```tsx
+<Routes>
+  <Route path="/" element={<Home />} />
+  <Route path="/budget/:month?" element={<Budget />} />
+  <Route path="*" element={<NotFound />} />
+</Routes>
+
+<Link to="/budget">가계부</Link>
+
+const { month } = useParams();
+const navigate = useNavigate();
+navigate("/budget/2026-11");   // { replace: true }로 기록을 남기지 않을 수 있고, navigate(-1)은 뒤로가기
+```
+
+### 설계 결정
+
+- **해시 방식입니다.** `#` 뒤의 값은 서버로 전송되지 않으므로, `python3 -m http.server` 같은 정적 서버에서도 새로고침과 직접 접속이 동작합니다. History API 방식은 모르는 경로에 `index.html`을 돌려주는 서버 설정이 필요합니다.
+- **`Link`는 진짜 `<a>`를 그립니다.** 해시만 바뀌므로 문서를 다시 불러오지 않고, 새 탭 열기와 키보드 이동도 그대로 동작합니다.
+- **`Router` 컴포넌트가 없습니다.** 현재 주소는 브라우저 전역 값이고 Context도 없으므로, 모듈의 구독 목록으로 전달합니다. `hashchange` 리스너를 하나만 두어 구독자들의 `setState`가 렌더 한 번으로 합쳐집니다.
+- **Focus Board는 별도 루트로 그립니다.** 라우터 아래에 두면 `App`이 최상위 컴포넌트가 아니게 되어 `rootOnlyHooks`를 켤 수 없기 때문입니다. 페이지가 effect에서 `render`하고 cleanup에서 `unmount`합니다.
+
+### React Router와의 차이
+
+| 항목 | mini-react | React Router v6 |
+|---|---|---|
+| 방식 | 해시만 지원 | History API와 해시 모두 지원 |
+| 라우트 선택 | 선언한 순서대로 처음 맞는 것 | 경로의 구체성 점수로 선택 |
+| 중첩 라우트 | 없음 (`Routes`는 앱에 하나만) | `Outlet`으로 지원 |
+| 코드 분할 | 없음 | `lazy`로 지원 |
+| 페이지 이탈 확인 | 없음 | `useBlocker`로 지원 |
 
 ## 개념 정리
 
@@ -124,9 +161,9 @@ render(<App />, root, { rootOnlyHooks: true });   // 자식이 훅을 호출하�
 npm test
 ```
 
-순수 로직(`createElement`, `expand`, `diff`, `describePatch`, `history`, `hooks`, `FunctionComponent`)을 Node 내장 `node:test`로 검증합니다.
+순수 로직(`createElement`, `expand`, `diff`, `describePatch`, `history`, `hooks`, `FunctionComponent`, 경로 매칭)을 Node 내장 `node:test`로 검증합니다.
 
-DOM이 필요한 부분은 의존성 없이 Node에서 돌릴 수 없어, 서버를 켠 뒤 `/tests.html`을 열어 실제 브라우저에서 실행합니다. DOM 변환, 속성, Patch, 렌더링의 단위 테스트와, 두 페이지를 iframe으로 열어 조작하는 기능 테스트가 있습니다. 이 페이지는 자동으로 실행되지만 CI에는 연결되어 있지 않습니다.
+DOM이 필요한 부분은 의존성 없이 Node에서 돌릴 수 없어, 서버를 켠 뒤 `/tests.html`을 열어 실제 브라우저에서 실행합니다. DOM 변환, 속성, Patch, 렌더링의 단위 테스트와, 앱을 iframe으로 열어 조작하는 기능 테스트가 있습니다. 이 페이지는 자동으로 실행되지만 CI에는 연결되어 있지 않습니다.
 
 ## 알려진 한계
 
@@ -135,3 +172,4 @@ DOM이 필요한 부분은 의존성 없이 Node에서 돌릴 수 없어, 서버
 - `<select multiple>`의 선택 상태는 property가 아니라 `selected` 속성으로만 비교합니다.
 - SVG 외의 네임스페이스(MathML)는 지원하지 않습니다.
 - `rootOnlyHooks`는 렌더 트리의 최상위 컴포넌트만 루트로 봅니다.
+- 라우트를 떠나면 페이지의 상태가 사라집니다. Phase 1의 State History와 적용하지 않은 편집도 확인 없이 사라집니다.

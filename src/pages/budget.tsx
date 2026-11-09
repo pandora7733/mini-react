@@ -1,6 +1,6 @@
 import { Fragment, h } from "../createElement.js";
-import { render } from "../render.js";
 import { useEffect, useMemo, useState } from "../hooks.js";
+import { Link, useNavigate, useParams } from "../router.js";
 
 const EXPENSE_CATEGORIES = ["식비", "교통", "여가", "생활"] as const;
 const INCOME = "수입";
@@ -291,11 +291,16 @@ function EntryRow({ entry, onSave, onRemove }: {
   );
 }
 
-// --- 루트: 여러 컴포넌트가 함께 쓰는 내역과 선택한 달만 둔다 ---
+// --- 페이지: 여러 컴포넌트가 함께 쓰는 내역만 상태로 둔다. 선택한 달은 주소에 있다 ---
 
-function App() {
+export function Budget() {
   const [entries, setEntries] = useStoredState<Entry[]>(STORAGE_KEY, sampleEntries, isEntryList);
-  const [month, setMonth] = useState(() => monthOf(new Date()));
+  const params = useParams();
+  const navigate = useNavigate();
+
+  // 주소는 사용자가 직접 고칠 수 있으므로 형식이 틀리면 이번 달을 보여 준다
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month ?? "") ? params.month : monthOf(new Date());
+  const showMonth = (next: string) => navigate(`/budget/${next}`);
 
   const monthEntries = useMemo(
     () => entries
@@ -320,7 +325,8 @@ function App() {
 
   const addEntry = (entry: Omit<Entry, "id">) => {
     setEntries(prev => [...prev, { ...entry, id: prev.reduce((max, e) => Math.max(max, e.id), 0) + 1 }]);
-    setMonth(entry.date.slice(0, 7));   // 다른 달의 내역을 추가하면 추가한 항목이 보이는 달로 옮긴다
+    const entryMonth = entry.date.slice(0, 7);
+    if (entryMonth !== month) showMonth(entryMonth);   // 다른 달의 내역을 추가하면 추가한 항목이 보이는 달로 옮긴다
   };
 
   const saveEntry = (id: number, title: string, amount: number) =>
@@ -329,16 +335,17 @@ function App() {
   const removeEntry = (id: number) => setEntries(prev => prev.filter(entry => entry.id !== id));
 
   return (
-    <>
+    <main className="page narrow">
+      <Link className="back-link" to="/">mini-react</Link>
       <header className="board-header">
         <div>
           <h1>가계부</h1>
-          <p>mini-react의 컴포넌트, Hooks, 커스텀 훅, SVG로 만든 예시 앱입니다.</p>
+          <p>mini-react의 컴포넌트, Hooks, 커스텀 훅, 라우터, SVG로 만든 예시 앱입니다.</p>
         </div>
         <nav className="budget-month" aria-label="달 선택">
-          <button id="month-prev" type="button" aria-label="이전 달" onClick={() => setMonth(m => shiftMonth(m, -1))}>←</button>
+          <button id="month-prev" type="button" aria-label="이전 달" onClick={() => showMonth(shiftMonth(month, -1))}>←</button>
           <strong id="month-label">{formatMonth(month)}</strong>
-          <button id="month-next" type="button" aria-label="다음 달" onClick={() => setMonth(m => shiftMonth(m, 1))}>→</button>
+          <button id="month-next" type="button" aria-label="다음 달" onClick={() => showMonth(shiftMonth(month, 1))}>→</button>
         </nav>
       </header>
       <Summary income={totals.income} expense={totals.expense} />
@@ -353,9 +360,6 @@ function App() {
             ))}
           </ul>
         )}
-    </>
+    </main>
   );
 }
-
-render(<App />, document.getElementById("root")!);
-document.body.dataset.ready = "true";
