@@ -50,6 +50,7 @@ interface Item {
 // 컴포넌트 상태(checked)와 DOM 상태(input 값)가 모두 key를 따라가는지 확인
 function Row({ item }: { item: Item }) {
   const [checked, setChecked] = useState(false);
+  console.log(`render Row ${item.text}`);
   return (
     <li>
       <button onClick={() => setChecked(c => !c)}>{checked ? "✔" : "○"}</button>
@@ -66,6 +67,7 @@ function List() {
     { id: 3, text: "체리" },
   ]);
   const [nextId, setNextId] = useState(4);
+  console.log("render List");
 
   return (
     <section>

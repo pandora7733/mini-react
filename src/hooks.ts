@@ -1,4 +1,4 @@
-import type { Component, VNode } from "./types.js";
+import type { Component, ComponentVNode, VNode } from "./types.js";
 
 type SetStateAction<S> = S | ((prev: S) => S);
 type Deps = readonly unknown[];
@@ -30,6 +30,9 @@ export interface Instance {
   pendingEffects: Array<() => void>;   // 이번 렌더에서 실행이 필요한 effect
   scheduleUpdate: () => void;
   unmounted: boolean;
+  dirty: boolean;                  // setState가 일어나서 다시 렌더해야 한다
+  vnode: ComponentVNode | null;    // 마지막으로 렌더한 vnode (null = 다시 렌더 필요)
+  output: VNode | null;            // 마지막 렌더 결과. 렌더를 건너뛸 때 그대로 다시 쓴다
 }
 
 let currentInstance: Instance | null = null;
@@ -86,6 +89,7 @@ export function useState<S>(
         : action;
       if (Object.is(next, hook.value)) return;
       hook.value = next;
+      instance.dirty = true;
       instance.scheduleUpdate();
     },
   };

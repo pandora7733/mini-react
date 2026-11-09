@@ -33,17 +33,29 @@ export function expand(vnode: VNode, path: string, ctx: ExpandContext): HostVNod
           pendingEffects: [],
           scheduleUpdate: ctx.scheduleUpdate,
           unmounted: false,
+          dirty: false,
+          vnode: null,
+          output: null,
         };
         ctx.instances.set(path, instance);
       }
       ctx.visited.add(path);
 
-      const output = renderComponent(instance, vnode.type, {
-        ...vnode.props,
-        children: vnode.children,
-      });
-      const hosts = expand(output ?? EMPTY, `${path}/r`, ctx);   // null 반환 = 빈 자리
+      // 부모가 다시 렌더되지 않았으면 vnode가 같은 객체다. dirty도 아니면 호출하지 않는다
+      if (instance.dirty || instance.vnode !== vnode) {
+        instance.dirty = false;   // 렌더 전에 지워서, 렌더 중 setState는 다음 렌더로 남긴다
+        instance.vnode = null;    // 렌더가 throw하면 다음에 다시 시도하도록 비워 둔다
+        instance.output = renderComponent(instance, vnode.type, {
+          ...vnode.props,
+          children: vnode.children,
+        });
+        instance.vnode = vnode;
+      }
+
+      // 호출을 건너뛰어도 아래로 내려간다: 자손 중에 dirty가 있을 수 있고, visited도 기록해야 한다
+      const hosts = expand(instance.output ?? EMPTY, `${path}/r`, ctx);   // null 반환 = 빈 자리
       ctx.effects.push(...instance.pendingEffects);   // 자식의 effect가 먼저 쌓인 뒤 부모
+      instance.pendingEffects = [];                   // 렌더를 건너뛰는 다음 번에 다시 실행되면 안 된다
       return hosts;
     }
   }
