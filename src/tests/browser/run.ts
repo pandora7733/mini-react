@@ -1,5 +1,6 @@
 import "./dom.test.js";
 import "./render.test.js";
+import "./router.test.js";
 import "./pages.test.js";
 import { runAll } from "./harness.js";
 

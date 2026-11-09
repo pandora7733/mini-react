@@ -1,7 +1,6 @@
 import { h } from "../createElement.js";
 import { useEffect } from "../hooks.js";
-import { render } from "../render.js";
-import { Link, Route, Routes } from "../router.js";
+import { Link, Route, Routes, startRouter } from "../router.js";
 import { Budget } from "./budget.js";
 import { Phase1Page } from "./phase1.js";
 import { Phase2Page } from "./phase2.js";
@@ -28,7 +27,7 @@ function Home() {
         </Link>
         <Link className="link-card" to="/budget">
           <strong>예시 앱. 가계부</strong>
-          <span>자식 컴포넌트의 자체 상태, 커스텀 훅, 라우트 파라미터, SVG 차트까지 mini-react만으로 만든 앱입니다.</span>
+          <span>커스텀 훅, 라우트 파라미터, SVG 차트까지 mini-react만으로 만든 앱입니다.</span>
         </Link>
         {/* 테스트 러너는 앱과 분리된 별도 문서이므로 라우트가 아니다 */}
         <a className="link-card" href="./tests.html">
@@ -54,17 +53,16 @@ function NotFound() {
   );
 }
 
-function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/phase1" element={<Phase1Page />} />
-      <Route path="/phase2" element={<Phase2Page />} />
-      <Route path="/budget/:month?" element={<Budget />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-}
-
-render(<App />, document.getElementById("root")!);
+// 각 페이지가 루트 컴포넌트가 되므로, 명세의 "훅과 상태는 루트에만" 제약을 모든 페이지에 강제한다
+startRouter(
+  <Routes>
+    <Route path="/" element={<Home />} />
+    <Route path="/phase1" element={<Phase1Page />} />
+    <Route path="/phase2" element={<Phase2Page />} />
+    <Route path="/budget/:month?" element={<Budget />} />
+    <Route path="*" element={<NotFound />} />
+  </Routes>,
+  document.getElementById("root")!,
+  { rootOnlyHooks: true },
+);
 document.body.dataset.ready = "true";

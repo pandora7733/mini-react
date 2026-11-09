@@ -1,6 +1,6 @@
 import { Fragment, h } from "../createElement.js";
 import { useEffect, useMemo, useState } from "../hooks.js";
-import { Link, useNavigate, useParams } from "../router.js";
+import { Link, navigate, type Params } from "../router.js";
 
 const EXPENSE_CATEGORIES = ["식비", "교통", "여가", "생활"] as const;
 const INCOME = "수입";
@@ -13,6 +13,19 @@ interface Entry {
   title: string;
   amount: number;
   category: Category;
+}
+
+interface FormDraft {
+  title: string;
+  amount: string;
+  category: Category;
+  date: string;
+}
+
+// 수정 중인 항목의 입력값. 없으면 그 항목은 보기 모드다
+interface EditDraft {
+  title: string;
+  amount: string;
 }
 
 const STORAGE_KEY = `mini-react:budget:${new URLSearchParams(location.search).get("board") ?? "default"}`;
@@ -51,6 +64,10 @@ function parseAmount(text: string): number | null {
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
+function isFilled(draft: { title: string; amount: string }): boolean {
+  return draft.title.trim() !== "" && parseAmount(draft.amount) !== null;
+}
+
 // --- 저장소 ---
 
 function sampleEntries(): Entry[] {
@@ -83,7 +100,7 @@ function isEntryList(value: unknown): value is Entry[] {
   return new Set(value.map(entry => entry.id)).size === value.length;
 }
 
-// 커스텀 훅: 일반 함수 안에서 기존 훅을 호출해 "저장되는 상태"를 재사용한다
+// 커스텀 훅: 일반 함수 안에서 기존 훅을 호출해 "저장되는 상태"를 재사용한다. 루트에서 호출하므로 제약에 맞다
 function useStoredState<T>(key: string, createInitial: () => T, isValid: (value: unknown) => value is T) {
   const [value, setValue] = useState<T>(() => {
     try {
@@ -106,7 +123,7 @@ function useStoredState<T>(key: string, createInitial: () => T, isValid: (value:
   return [value, setValue] as const;
 }
 
-// --- 상태 없는 컴포넌트 ---
+// --- 자식 컴포넌트: 상태 없이 props만 받는 순수 함수 ---
 
 function Summary({ income, expense }: { income: number; expense: number }) {
   return (
@@ -118,15 +135,7 @@ function Summary({ income, expense }: { income: number; expense: number }) {
   );
 }
 
-function SpendingChart({ entries }: { entries: Entry[] }) {
-  const rows = useMemo(() => {
-    const totals = new Map<Category, number>();
-    for (const entry of entries) {
-      if (entry.category !== INCOME) totals.set(entry.category, (totals.get(entry.category) ?? 0) + entry.amount);
-    }
-    return Array.from(totals).sort((a, b) => b[1] - a[1]);
-  }, [entries]);
-
+function SpendingChart({ rows }: { rows: Array<[Category, number]> }) {
   if (rows.length === 0) return null;
 
   const max = rows[0][1];
@@ -150,34 +159,25 @@ function SpendingChart({ entries }: { entries: Entry[] }) {
   );
 }
 
-// --- 자체 상태를 가진 자식 컴포넌트: 입력 중인 값은 이 컴포넌트만 알면 된다 ---
-
-function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<Category>("식비");
-  const [date, setDate] = useState(today);
-
-  const parsedAmount = parseAmount(amount);
-  const canAdd = title.trim() !== "" && parsedAmount !== null && date !== "";
-
+function EntryForm({ form, onChange, onAdd }: {
+  form: FormDraft;
+  onChange: (change: Partial<FormDraft>) => void;
+  onAdd: () => void;
+}) {
   return (
     <form
       className="task-form"
       onSubmit={event => {
         event.preventDefault();
-        if (!canAdd) return;
-        onAdd({ date, title: title.trim(), amount: parsedAmount, category });
-        setTitle("");
-        setAmount("");
+        onAdd();
       }}
     >
       <input
         id="entry-title"
         aria-label="내용"
         placeholder="내용"
-        value={title}
-        onInput={event => setTitle((event.target as HTMLInputElement).value)}
+        value={form.title}
+        onInput={event => onChange({ title: (event.target as HTMLInputElement).value })}
       />
       <input
         id="entry-amount"
@@ -186,14 +186,14 @@ function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
         min="1"
         aria-label="금액"
         placeholder="금액"
-        value={amount}
-        onInput={event => setAmount((event.target as HTMLInputElement).value)}
+        value={form.amount}
+        onInput={event => onChange({ amount: (event.target as HTMLInputElement).value })}
       />
       <select
         id="entry-category"
         aria-label="분류"
-        value={category}
-        onChange={event => setCategory((event.target as HTMLSelectElement).value as Category)}
+        value={form.category}
+        onChange={event => onChange({ category: (event.target as HTMLSelectElement).value as Category })}
       >
         {EXPENSE_CATEGORIES.map(name => <option key={name} value={name}>{name}</option>)}
         <option value={INCOME}>{INCOME}</option>
@@ -203,48 +203,39 @@ function EntryForm({ onAdd }: { onAdd: (entry: Omit<Entry, "id">) => void }) {
         className="budget-date"
         type="date"
         aria-label="날짜"
-        value={date}
-        onInput={event => setDate((event.target as HTMLInputElement).value)}
+        value={form.date}
+        onInput={event => onChange({ date: (event.target as HTMLInputElement).value })}
       />
-      <button id="entry-add" className="primary" type="submit" disabled={!canAdd}>추가</button>
+      <button id="entry-add" className="primary" type="submit" disabled={!isFilled(form) || form.date === ""}>추가</button>
     </form>
   );
 }
 
-function EntryRow({ entry, onSave, onRemove }: {
+function EntryRow({ entry, draft, onEdit, onDraft, onCancel, onSave, onRemove }: {
   entry: Entry;
-  onSave: (id: number, title: string, amount: number) => void;
+  draft: EditDraft | undefined;
+  onEdit: (entry: Entry) => void;
+  onDraft: (id: number, change: Partial<EditDraft>) => void;
+  onCancel: (id: number) => void;
+  onSave: (id: number) => void;
   onRemove: (id: number) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(entry.title);
-  const [amount, setAmount] = useState(String(entry.amount));
-
-  const parsedAmount = parseAmount(amount);
-  const canSave = title.trim() !== "" && parsedAmount !== null;
-
-  const startEditing = () => {
-    setTitle(entry.title);
-    setAmount(String(entry.amount));
-    setEditing(true);
-  };
-
   const cancelOnEscape = (event: KeyboardEvent) => {
-    if (event.key === "Escape") setEditing(false);
+    if (event.key === "Escape") onCancel(entry.id);
   };
 
   const income = entry.category === INCOME;
 
   return (
     <li className="task" data-entry-id={entry.id}>
-      {editing
+      {draft !== undefined
         ? (
           <>
             <input
               className="budget-edit"
               aria-label="내용 수정"
-              value={title}
-              onInput={event => setTitle((event.target as HTMLInputElement).value)}
+              value={draft.title}
+              onInput={event => onDraft(entry.id, { title: (event.target as HTMLInputElement).value })}
               onKeydown={cancelOnEscape}
             />
             <input
@@ -252,24 +243,13 @@ function EntryRow({ entry, onSave, onRemove }: {
               type="number"
               min="1"
               aria-label="금액 수정"
-              value={amount}
-              onInput={event => setAmount((event.target as HTMLInputElement).value)}
+              value={draft.amount}
+              onInput={event => onDraft(entry.id, { amount: (event.target as HTMLInputElement).value })}
               onKeydown={cancelOnEscape}
             />
             <div className="task-actions">
-              <button
-                type="button"
-                data-action="save"
-                disabled={!canSave}
-                onClick={() => {
-                  if (!canSave) return;
-                  onSave(entry.id, title.trim(), parsedAmount);
-                  setEditing(false);
-                }}
-              >
-                저장
-              </button>
-              <button type="button" data-action="cancel" onClick={() => setEditing(false)}>취소</button>
+              <button type="button" data-action="save" disabled={!isFilled(draft)} onClick={() => onSave(entry.id)}>저장</button>
+              <button type="button" data-action="cancel" onClick={() => onCancel(entry.id)}>취소</button>
             </div>
           </>
         )
@@ -282,7 +262,7 @@ function EntryRow({ entry, onSave, onRemove }: {
               {`${income ? "+" : "-"}${formatWon(entry.amount)}`}
             </span>
             <div className="task-actions">
-              <button type="button" data-action="edit" aria-label={`${entry.title} 수정`} onClick={startEditing}>수정</button>
+              <button type="button" data-action="edit" aria-label={`${entry.title} 수정`} onClick={() => onEdit(entry)}>수정</button>
               <button type="button" data-action="remove" aria-label={`${entry.title} 삭제`} onClick={() => onRemove(entry.id)}>삭제</button>
             </div>
           </>
@@ -291,12 +271,12 @@ function EntryRow({ entry, onSave, onRemove }: {
   );
 }
 
-// --- 페이지: 여러 컴포넌트가 함께 쓰는 내역만 상태로 둔다. 선택한 달은 주소에 있다 ---
+// --- 루트 컴포넌트: 상태와 훅은 모두 여기에만 둔다. 선택한 달은 주소에 있으므로 상태가 아니다 ---
 
-export function Budget() {
+export function Budget({ params = {} }: { params?: Params }) {
   const [entries, setEntries] = useStoredState<Entry[]>(STORAGE_KEY, sampleEntries, isEntryList);
-  const params = useParams();
-  const navigate = useNavigate();
+  const [form, setForm] = useState<FormDraft>(() => ({ title: "", amount: "", category: "식비", date: today() }));
+  const [edits, setEdits] = useState<Record<number, EditDraft>>({});
 
   // 주소는 사용자가 직접 고칠 수 있으므로 형식이 틀리면 이번 달을 보여 준다
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month ?? "") ? params.month : monthOf(new Date());
@@ -319,20 +299,54 @@ export function Budget() {
     return { income, expense };
   }, [monthEntries]);
 
+  const chartRows = useMemo(() => {
+    const amounts = new Map<Category, number>();
+    for (const entry of monthEntries) {
+      if (entry.category !== INCOME) amounts.set(entry.category, (amounts.get(entry.category) ?? 0) + entry.amount);
+    }
+    return Array.from(amounts).sort((a, b) => b[1] - a[1]);
+  }, [monthEntries]);
+
   useEffect(() => {
     document.title = `${formatMonth(month)} 가계부`;
   }, [month]);
 
-  const addEntry = (entry: Omit<Entry, "id">) => {
-    setEntries(prev => [...prev, { ...entry, id: prev.reduce((max, e) => Math.max(max, e.id), 0) + 1 }]);
-    const entryMonth = entry.date.slice(0, 7);
+  const addEntry = () => {
+    const amount = parseAmount(form.amount);
+    if (amount === null || form.title.trim() === "" || form.date === "") return;
+    const { date, category } = form;
+    const title = form.title.trim();
+    setEntries(prev => [...prev, { id: prev.reduce((max, e) => Math.max(max, e.id), 0) + 1, date, title, amount, category }]);
+    setForm(prev => ({ ...prev, title: "", amount: "" }));
+    const entryMonth = date.slice(0, 7);
     if (entryMonth !== month) showMonth(entryMonth);   // 다른 달의 내역을 추가하면 추가한 항목이 보이는 달로 옮긴다
   };
 
-  const saveEntry = (id: number, title: string, amount: number) =>
-    setEntries(prev => prev.map(entry => (entry.id === id ? { ...entry, title, amount } : entry)));
+  const startEdit = (entry: Entry) =>
+    setEdits(prev => ({ ...prev, [entry.id]: { title: entry.title, amount: String(entry.amount) } }));
 
-  const removeEntry = (id: number) => setEntries(prev => prev.filter(entry => entry.id !== id));
+  const changeEdit = (id: number, change: Partial<EditDraft>) =>
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...change } }));
+
+  const closeEdit = (id: number) =>
+    setEdits(prev => {
+      const { [id]: _closed, ...rest } = prev;
+      return rest;
+    });
+
+  const saveEdit = (id: number) => {
+    const draft = edits[id];
+    const amount = parseAmount(draft.amount);
+    if (amount === null || draft.title.trim() === "") return;
+    const title = draft.title.trim();
+    setEntries(prev => prev.map(entry => (entry.id === id ? { ...entry, title, amount } : entry)));
+    closeEdit(id);
+  };
+
+  const removeEntry = (id: number) => {
+    setEntries(prev => prev.filter(entry => entry.id !== id));
+    closeEdit(id);
+  };
 
   return (
     <main className="page narrow">
@@ -349,14 +363,23 @@ export function Budget() {
         </nav>
       </header>
       <Summary income={totals.income} expense={totals.expense} />
-      <SpendingChart entries={monthEntries} />
-      <EntryForm onAdd={addEntry} />
+      <SpendingChart rows={chartRows} />
+      <EntryForm form={form} onChange={change => setForm(prev => ({ ...prev, ...change }))} onAdd={addEntry} />
       {monthEntries.length === 0
         ? <p id="empty-state" className="empty-state">이 달의 내역이 없습니다.</p>
         : (
           <ul id="entry-list" className="task-list">
             {monthEntries.map(entry => (
-              <EntryRow key={entry.id} entry={entry} onSave={saveEntry} onRemove={removeEntry} />
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                draft={edits[entry.id]}
+                onEdit={startEdit}
+                onDraft={changeEdit}
+                onCancel={closeEdit}
+                onSave={saveEdit}
+                onRemove={removeEntry}
+              />
             ))}
           </ul>
         )}

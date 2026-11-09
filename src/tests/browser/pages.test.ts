@@ -641,6 +641,42 @@ test("라우터: 페이지를 떠나면 Focus Board를 정리하고, 돌아오�
   localStorage.removeItem(E2E_STORAGE_KEY);
 });
 
+test("라우터: Phase 1에 적용하지 않은 편집이 있으면 떠나기 전에 묻고, 취소하면 머문다", async () => {
+  const p = await phase1();
+  await p.scenario("text");
+  const draft = p.testArea.innerHTML;
+
+  $(p.doc, 'a.back-link[href="#/"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.dialog.asked, 1);
+  assert.equal(p.win.location.hash, "#/phase1");
+  assert.equal(p.testArea.innerHTML, draft);
+  assert.equal(p.doc.querySelector(".link-list"), null);
+
+  p.dialog.answer = true;
+  $(p.doc, 'a.back-link[href="#/"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.dialog.asked, 2);
+  assert.ok(p.doc.querySelector(".link-list") !== null);
+  p.close();
+});
+
+test("라우터: Phase 1에 편집이 없으면 묻지 않고 떠나며, 다른 페이지에서는 묻지 않는다", async () => {
+  const p = await phase1();
+  $(p.doc, 'a.back-link[href="#/"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.dialog.asked, 0);
+  assert.ok(p.doc.querySelector(".link-list") !== null);
+
+  $(p.doc, 'a[href="#/phase2"]').click();
+  await wait(ROUTE_WAIT);
+  $(p.doc, 'a.back-link[href="#/"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.dialog.asked, 0);
+  p.close();
+  localStorage.removeItem("mini-react:focus-board:default");
+});
+
 test("라우터: Phase 1을 떠났다 돌아와도 다시 동작한다", async () => {
   const page = await openPage("./index.html#/phase1");
   page.win.location.hash = "/";
@@ -725,7 +761,7 @@ test("가계부: 다른 달의 항목을 추가하면 그 달로 이동한다", 
   p.close();
 });
 
-test("가계부: 수정 모드는 항목별 상태이고 다른 항목이 바뀌어도 유지된다", async () => {
+test("가계부: 수정 모드는 항목별로 유지되고 다른 항목이 바뀌어도 사라지지 않는다", async () => {
   const p = await budget();
   const row = p.row(2)!;
   row.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();

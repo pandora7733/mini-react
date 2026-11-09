@@ -1,5 +1,4 @@
 import { h } from "../createElement.js";
-import { render, unmount } from "../render.js";
 import { useEffect, useMemo, useState } from "../hooks.js";
 import { Link } from "../router.js";
 
@@ -198,10 +197,9 @@ function TaskItem({ task, canMoveUp, canMoveDown, onToggle, onMove, onRemove }: 
 let renderCount = 0;
 let memoCount = 0;
 
-let root: HTMLElement;
 let domObserver: MutationObserver;
 
-function App() {
+export function Phase2Page() {
   renderCount++;
 
   const [tasks, setTasks] = useState<Task[]>(loadTasks);
@@ -212,7 +210,7 @@ function App() {
   const [seconds, setSeconds] = useState(FOCUS_SECONDS);
   const [running, setRunning] = useState(false);
 
-  // 타이머가 매초 App을 다시 렌더해도 tasks, filter, query가 그대로면 다시 계산하지 않는다
+  // 타이머가 매초 다시 렌더해도 tasks, filter, query가 그대로면 다시 계산하지 않는다
   const visible = useMemo(() => {
     memoCount++;
     const keyword = query.trim().toLowerCase();
@@ -245,12 +243,22 @@ function App() {
     if (seconds === 0) setRunning(false);
   }, [seconds]);
 
-  // 렌더 트리 밖의 지표 갱신. 상태가 아니므로 다시 렌더를 일으키지 않는다
+  useEffect(() => {
+    domObserver = new MutationObserver(() => {});
+    domObserver.observe(document.getElementById("focus-board")!, { childList: true, subtree: true, attributes: true, characterData: true });
+    return () => {
+      domObserver.disconnect();
+      renderCount = 0;
+      memoCount = 0;
+    };
+  }, []);
+
+  // 지표는 DOM에 직접 쓴다. 상태로 만들면 갱신이 다시 갱신을 부른다
   useEffect(() => {
     setText("engine-renders", renderCount);
     setText("engine-memos", memoCount);
     setText("engine-mutations", domObserver.takeRecords().length);
-    setText("engine-nodes", root.querySelectorAll("*").length);
+    setText("engine-nodes", document.querySelectorAll("#focus-board *").length);
   });
 
   const addTask = () => {
@@ -278,59 +286,72 @@ function App() {
     });
 
   return (
-    <div>
-      <header className="board-header">
-        <div>
-          <h1>Focus Board</h1>
-          <p>상태는 모두 루트 App에 있고, 자식은 props만 받습니다.</p>
-        </div>
-        <FocusTimer
-          seconds={seconds}
-          running={running}
-          onToggle={() => setRunning(r => !r && seconds > 0)}
-          onReset={() => {
-            setRunning(false);
-            setSeconds(FOCUS_SECONDS);
-          }}
+    <main className="page narrow">
+      <Link className="back-link" to="/">mini-react</Link>
+      <div id="focus-board">
+        <header className="board-header">
+          <div>
+            <h1>Focus Board</h1>
+            <p>상태는 모두 루트 컴포넌트에 있고, 자식은 props만 받습니다.</p>
+          </div>
+          <FocusTimer
+            seconds={seconds}
+            running={running}
+            onToggle={() => setRunning(r => !r && seconds > 0)}
+            onReset={() => {
+              setRunning(false);
+              setSeconds(FOCUS_SECONDS);
+            }}
+          />
+        </header>
+        <Stats total={stats.total} done={stats.done} high={stats.high} />
+        <TaskForm
+          draft={draft}
+          priority={priority}
+          onDraft={setDraft}
+          onPriority={setPriority}
+          onAdd={addTask}
         />
-      </header>
-      <Stats total={stats.total} done={stats.done} high={stats.high} />
-      <TaskForm
-        draft={draft}
-        priority={priority}
-        onDraft={setDraft}
-        onPriority={setPriority}
-        onAdd={addTask}
-      />
-      <FilterBar
-        filter={filter}
-        query={query}
-        onFilter={setFilter}
-        onQuery={setQuery}
-        onClearDone={() => setTasks(prev => prev.filter(task => !task.done))}
-        canClear={stats.done > 0}
-      />
-      {visible.length === 0
-        ? <p id="empty-state" className="empty-state">표시할 할 일이 없습니다.</p>
-        : (
-          <ul id="task-list" className="task-list">
-            {visible.map(task => {
-              const index = tasks.indexOf(task);
-              return (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < tasks.length - 1}
-                  onToggle={toggleTask}
-                  onMove={moveTask}
-                  onRemove={removeTask}
-                />
-              );
-            })}
-          </ul>
-        )}
-    </div>
+        <FilterBar
+          filter={filter}
+          query={query}
+          onFilter={setFilter}
+          onQuery={setQuery}
+          onClearDone={() => setTasks(prev => prev.filter(task => !task.done))}
+          canClear={stats.done > 0}
+        />
+        {visible.length === 0
+          ? <p id="empty-state" className="empty-state">표시할 할 일이 없습니다.</p>
+          : (
+            <ul id="task-list" className="task-list">
+              {visible.map(task => {
+                const index = tasks.indexOf(task);
+                return (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < tasks.length - 1}
+                    onToggle={toggleTask}
+                    onMove={moveTask}
+                    onRemove={removeTask}
+                  />
+                );
+              })}
+            </ul>
+          )}
+      </div>
+      {/* 여기 있는 값은 effect가 직접 채운다. vnode에 자식이 없으므로 diff가 건드리지 않는다 */}
+      <aside className="engine" aria-label="엔진 동작 지표">
+        <h2>엔진 동작</h2>
+        <dl>
+          <div><dt>루트 렌더</dt><dd id="engine-renders"></dd></div>
+          <div><dt>useMemo 재계산</dt><dd id="engine-memos"></dd></div>
+          <div><dt>마지막 갱신의 DOM 변경</dt><dd id="engine-mutations"></dd></div>
+          <div><dt>전체 DOM 노드</dt><dd id="engine-nodes"></dd></div>
+        </dl>
+      </aside>
+    </main>
   );
 }
 
@@ -342,39 +363,3 @@ function setText(id: string, value: number): void {
   document.getElementById(id)!.textContent = String(value);
 }
 
-// 명세의 "상태는 루트에만" 제약을 지키도록 라우터 아래가 아니라 별도 루트로 그린다.
-// 라우터 트리에 넣으면 App이 최상위 컴포넌트가 아니게 되어 rootOnlyHooks를 켤 수 없다
-function mountFocusBoard(container: HTMLElement): () => void {
-  renderCount = 0;
-  memoCount = 0;
-  root = container;
-  domObserver = new MutationObserver(() => {});
-  domObserver.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
-  render(<App />, root, { rootOnlyHooks: true });
-
-  return () => {
-    unmount(container);   // 타이머 같은 effect를 정리한다
-    domObserver.disconnect();
-  };
-}
-
-export function Phase2Page() {
-  useEffect(() => mountFocusBoard(document.getElementById("focus-board")!), []);
-
-  return (
-    <main className="page narrow">
-      <Link className="back-link" to="/">mini-react</Link>
-      <div id="focus-board"></div>
-      {/* 렌더 트리 밖에 둔다: 이 숫자를 상태로 만들면 갱신이 다시 갱신을 부른다 */}
-      <aside className="engine" aria-label="엔진 동작 지표">
-        <h2>엔진 동작</h2>
-        <dl>
-          <div><dt>App 렌더</dt><dd id="engine-renders">0</dd></div>
-          <div><dt>useMemo 재계산</dt><dd id="engine-memos">0</dd></div>
-          <div><dt>마지막 갱신의 DOM 변경</dt><dd id="engine-mutations">0</dd></div>
-          <div><dt>전체 DOM 노드</dt><dd id="engine-nodes">0</dd></div>
-        </dl>
-      </aside>
-    </main>
-  );
-}

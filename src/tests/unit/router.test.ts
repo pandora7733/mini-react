@@ -22,6 +22,12 @@ test("경로: 파라미터를 읽고 디코딩한다", () => {
   assert.equal(matchPath("/posts/:id", "/posts"), null);
 });
 
+test("경로: 인코딩된 주소도 한글 고정 경로와 맞는다", () => {
+  assert.deepEqual(matchPath("/한글", "/%ED%95%9C%EA%B8%80"), {});
+  assert.deepEqual(matchPath("/한글/:id", "/%ED%95%9C%EA%B8%80/1"), { id: "1" });
+  assert.equal(matchPath("/한글", "/%ED%95%9C"), null);
+});
+
 test("경로: 깨진 인코딩이어도 예외를 던지지 않는다", () => {
   assert.deepEqual(matchPath("/posts/:id", "/posts/%E0%A4%A"), { id: "%E0%A4%A" });
 });

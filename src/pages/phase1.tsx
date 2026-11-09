@@ -9,7 +9,7 @@ import { serializeHtml } from "../serializeHtml.js";
 import { describePatch, type Change, type ChangeKind } from "../describePatch.js";
 import { StateHistory } from "../history.js";
 import { useEffect } from "../hooks.js";
-import { Link } from "../router.js";
+import { Link, setLeaveGuard } from "../router.js";
 
 interface Snapshot {
   label: string;
@@ -118,10 +118,17 @@ function mountPhase1(): () => void {
     if (name !== undefined) runScenario(name);
   });
 
+  setLeaveGuard(canDiscardEdits);
+
   return () => {
+    setLeaveGuard(null);
     realObserver.disconnect();
     testObserver.disconnect();
   };
+
+  function canDiscardEdits(): boolean {
+    return !hasUnappliedEdits() || confirm("적용하지 않은 변경이 있습니다. 버리고 이동할까요?");
+  }
 
   function readTestArea(): HostVNode[] {
     // 편집기가 나눠 놓은 인접 텍스트 노드를 합쳐서 같은 내용이면 같은 트리가 되게 한다
@@ -162,7 +169,7 @@ function mountPhase1(): () => void {
   }
 
   function moveTo(index: number): void {
-    if (hasUnappliedEdits() && !confirm("적용하지 않은 변경이 있습니다. 버리고 이동할까요?")) return;
+    if (!canDiscardEdits()) return;
 
     const prev = history.current.vdom;
     const target = history.go(index).vdom;
