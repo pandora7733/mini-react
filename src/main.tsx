@@ -8,7 +8,7 @@ function EvenBadge({ count }: { count: number }) {
     console.log("effect EvenBadge: mount");
     return () => console.log("cleanup EvenBadge: unmount");
   }, []);
-  return count % 2 === 0 ? h("em", null, "짝수") : null;
+  return count % 2 === 0 ? <em>짝수</em> : null;
 }
 
 function Counter({ label }: { label: string }) {
@@ -32,11 +32,13 @@ function Counter({ label }: { label: string }) {
 
   const increment = useCallback(() => setCount(c => c + 1), []);
 
-  return h("div", null,
-    h("span", null, label, ": ", count, " (x2 = ", doubled, ")"),
-    h("button", { onClick: increment }, "+1"),
-    h("button", { onClick: () => { setCount(c => c + 1); setCount(c => c + 1); } }, "+2"),
-    label === "A" && h(EvenBadge, { count }),
+  return (
+    <div>
+      <span>{label}: {count} (x2 = {doubled})</span>
+      <button onClick={increment}>+1</button>
+      <button onClick={() => { setCount(c => c + 1); setCount(c => c + 1); }}>+2</button>
+      {label === "A" && <EvenBadge count={count} />}
+    </div>
   );
 }
 
@@ -48,10 +50,12 @@ interface Item {
 // 컴포넌트 상태(checked)와 DOM 상태(input 값)가 모두 key를 따라가는지 확인
 function Row({ item }: { item: Item }) {
   const [checked, setChecked] = useState(false);
-  return h("li", null,
-    h("button", { onClick: () => setChecked(c => !c) }, checked ? "✔" : "○"),
-    " ", item.text, " ",
-    h("input", { placeholder: "메모" }),
+  return (
+    <li>
+      <button onClick={() => setChecked(c => !c)}>{checked ? "✔" : "○"}</button>
+      {" "}{item.text}{" "}
+      <input placeholder="메모" />
+    </li>
   );
 }
 
@@ -63,11 +67,15 @@ function List() {
   ]);
   const [nextId, setNextId] = useState(4);
 
-  return h("section", null,
-    h("button", { onClick: () => { setItems(xs => [{ id: nextId, text: `새 항목 ${nextId}` }, ...xs]); setNextId(n => n + 1); } }, "맨 앞에 추가"),
-    h("button", { onClick: () => setItems(xs => [...xs].reverse()) }, "뒤집기"),
-    h("button", { onClick: () => setItems(xs => xs.slice(1)) }, "첫 항목 삭제"),
-    h("ul", null, items.map(item => h(Row, { key: item.id, item }))),
+  return (
+    <section>
+      <button onClick={() => { setItems(xs => [{ id: nextId, text: `새 항목 ${nextId}` }, ...xs]); setNextId(n => n + 1); }}>맨 앞에 추가</button>
+      <button onClick={() => setItems(xs => [...xs].reverse())}>뒤집기</button>
+      <button onClick={() => setItems(xs => xs.slice(1))}>첫 항목 삭제</button>
+      <ul>
+        {items.map(item => <Row key={item.id} item={item} />)}
+      </ul>
+    </section>
   );
 }
 
@@ -80,18 +88,20 @@ function App() {
   });
 
   // B를 input 앞에 둔다: null 자리가 유지되므로 B가 사라져도 input은 그대로여야 한다
-  return h("div", null,
-    h(Counter, { label: "A" }),
-    showB ? h(Counter, { label: "B" }) : null,
-    h("button", { onClick: () => setShowB(s => !s) }, "B 토글"),
-    h("input", { placeholder: "입력값이 유지되는지 확인" }),
-    h(List, null),
+  return (
+    <div>
+      <Counter label="A" />
+      {showB ? <Counter label="B" /> : null}
+      <button onClick={() => setShowB(s => !s)}>B 토글</button>
+      <input placeholder="입력값이 유지되는지 확인" />
+      <List />
+    </div>
   );
 }
 
-render(h(App, null), document.getElementById("root")!);
+render(<App />, document.getElementById("root")!);
 
 // @ts-expect-error label은 string이어야 함
-h(Counter, { label: 1 });
-// @ts-expect-error 필수 props가 있으면 null 불가
-h(Counter, null);
+<Counter label={1} />;
+// @ts-expect-error 필수 prop label이 없음
+<Counter />;
