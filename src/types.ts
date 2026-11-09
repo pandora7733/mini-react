@@ -58,6 +58,15 @@ export type Patch =
   | { type: "REMOVE" }
   | { type: "REPLACE"; vnode: HostVNode }
   | { type: "TEXT"; value: string }
-  | { type: "UPDATE"; props: PropPatch[]; children: ChildPatch[] };
+  | { type: "UPDATE"; props: PropPatch[]; children: ChildrenPatch };
 
 export type ChildPatch = Patch | null;   // null = 이 자식은 변경 없음
+
+// keyed 모드에서 새 children의 i번째 자리를 무엇으로 채울지
+export type KeyedChildPatch =
+  | { type: "REUSE"; from: number; patch: ChildPatch }   // 기존 from번째 노드를 재사용 (필요하면 이동)
+  | { type: "INSERT"; vnode: HostVNode };                 // 새 노드 생성
+
+export type ChildrenPatch =
+  | { mode: "index"; patches: ChildPatch[] }
+  | { mode: "keyed"; removed: number[]; order: KeyedChildPatch[] };

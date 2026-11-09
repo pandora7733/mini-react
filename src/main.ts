@@ -40,6 +40,37 @@ function Counter({ label }: { label: string }) {
   );
 }
 
+interface Item {
+  id: number;
+  text: string;
+}
+
+// 컴포넌트 상태(checked)와 DOM 상태(input 값)가 모두 key를 따라가는지 확인
+function Row({ item }: { item: Item }) {
+  const [checked, setChecked] = useState(false);
+  return h("li", null,
+    h("button", { onClick: () => setChecked(c => !c) }, checked ? "✔" : "○"),
+    " ", item.text, " ",
+    h("input", { placeholder: "메모" }),
+  );
+}
+
+function List() {
+  const [items, setItems] = useState<Item[]>([
+    { id: 1, text: "사과" },
+    { id: 2, text: "바나나" },
+    { id: 3, text: "체리" },
+  ]);
+  const [nextId, setNextId] = useState(4);
+
+  return h("section", null,
+    h("button", { onClick: () => { setItems(xs => [{ id: nextId, text: `새 항목 ${nextId}` }, ...xs]); setNextId(n => n + 1); } }, "맨 앞에 추가"),
+    h("button", { onClick: () => setItems(xs => [...xs].reverse()) }, "뒤집기"),
+    h("button", { onClick: () => setItems(xs => xs.slice(1)) }, "첫 항목 삭제"),
+    h("ul", null, items.map(item => h(Row, { key: item.id, item }))),
+  );
+}
+
 function App() {
   const [showB, setShowB] = useState(true);
   console.log("render App");
@@ -54,6 +85,7 @@ function App() {
     showB ? h(Counter, { label: "B" }) : null,
     h("button", { onClick: () => setShowB(s => !s) }, "B 토글"),
     h("input", { placeholder: "입력값이 유지되는지 확인" }),
+    h(List, null),
   );
 }
 
