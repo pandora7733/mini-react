@@ -1,0 +1,19 @@
+{
+  "name": "mini-react",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsc && node --test \"dist/tests/unit/*.test.js\"",
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "serve": "python3 -m http.server 5173"
+  },
+  "keywords": [],
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+  }
+}

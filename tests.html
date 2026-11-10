@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>브라우저 테스트</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page narrow">
+      <header class="page-header">
+        <a class="back-link" href="./index.html">mini-react</a>
+        <h1>브라우저 테스트</h1>
+        <p id="summary" role="status">실행 중</p>
+      </header>
+      <ol id="results" class="test-results"></ol>
+      <div id="sandbox" hidden></div>
+    </main>
+    <script type="module" src="./dist/tests/browser/run.js"></script>
+  </body>
+</html>
