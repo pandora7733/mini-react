@@ -1134,6 +1134,7 @@ a.budget-button:hover {
 
 .cp {
   position: relative;
+  overflow: clip;   /* 폭발로 날아간 캔이 가로 스크롤을 만들지 않게 한다 */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -2190,7 +2191,6 @@ a.budget-button:hover {
 }
 
 .vm-tray {
-  align-items: flex-end;
   min-height: 76px;
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
 }
@@ -2200,60 +2200,323 @@ a.budget-button:hover {
   box-shadow: inset 0 -10px 24px rgba(243, 255, 26, 0.08);
 }
 
-.vm-tray-label {
-  align-self: center;
+.vm-tray {
+  display: grid;
+  gap: 8px;
+  align-items: stretch;
 }
 
-.vm-tray-pile {
+.vm-tray-head {
   display: flex;
-  flex: 1;
-  flex-wrap: wrap-reverse;   /* 새 줄이 위로 쌓여 더미처럼 보인다 */
-  align-items: flex-end;
-  min-width: 0;
-  min-height: 34px;
-  padding: 6px 12px 2px 4px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vm-load {
+  color: var(--vm-muted);
+  font-family: var(--cp-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-tray.warning {
+  border-color: var(--vm-red);
+  box-shadow: inset 0 -12px 28px rgba(255, 59, 92, 0.18);
+}
+
+.vm-tray.warning .vm-load {
+  color: var(--vm-red);
+  animation: vm-blink 0.8s steps(2) infinite;
+}
+
+/* 꺼내는 곳 바닥. 캔은 바닥 기준 절대 위치에 놓이고, 많이 쌓이면 위로 넘쳐 보인다 */
+.vm-tray-box {
+  position: relative;
+  height: 150px;
+  border-bottom: 2px solid var(--vm-line);
+  background: linear-gradient(to bottom, transparent 40%, rgba(0, 240, 255, 0.05));
 }
 
 .vm-tray-empty {
-  align-self: center;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
 }
 
-/* 바닥에 누운 캔 */
+/* 진열칸과 같은 크기(34×58)의 캔 */
 .vm-tray-can {
-  position: relative;
-  flex: none;
-  width: 50px;
-  height: 26px;
-  margin: 0 -12px -6px 0;
-  border-radius: 3px 4px 4px 3px;
+  position: absolute;
+  width: 34px;
+  height: 58px;
+  border-radius: 4px 4px 3px 3px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+  pointer-events: none;   /* 넘친 캔이 버튼을 가려도 누를 수 있게 한다 */
   will-change: transform;
 }
 
 .vm-tray-can::before {
   content: "";
   position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: -3px;
-  width: 4px;
-  border-radius: 2px 0 0 2px;
+  top: -3px;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  border-radius: 2px 2px 0 0;
   background: #a9afbd;
 }
 
 .vm-tray-can::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 40%;
-  width: 8px;
+  top: 40%;
+  left: 0;
+  right: 0;
+  height: 9px;
   background: rgba(10, 11, 16, 0.55);
 }
 
 .vm-tray-item {
-  flex: none;
-  align-self: center;
+  justify-self: end;
+}
+
+/* --- 자판기: 적재 경고, 폭발, 잔해 --- */
+
+.vm-wave-flat {
+  display: none;
+}
+
+.vm.is-exploded .vm-wave-sine,
+.vm.is-exploded .vm-wave-noise {
+  display: none;
+}
+
+.vm.is-exploded .vm-wave-flat {
+  display: inline;
+}
+
+.vm.is-exploded .vm-wave-line {
+  animation: none;
+  opacity: 0.6;
+}
+
+.vm-frame.is-warning::before {
+  animation-duration: 0.6s;
+}
+
+.vm-frame.is-warning .vm-edge {
+  animation: vm-jitter 0.18s steps(2) infinite;
+}
+
+.vm-frame.is-exploded {
+  --vm-signal: #7a2232;
+  animation: vm-shake 700ms cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+}
+
+.vm-frame.is-exploded::before {
+  animation: vm-burst 1.4s ease-out 1 forwards;
+}
+
+/* 터진 뒤에는 깎은 모서리 틀이 무너져 캔이 기계 밖으로 날아갈 수 있다 */
+.vm-frame.is-exploded .vm-edge,
+.vm.is-exploded {
+  clip-path: none;
+}
+
+.vm.is-exploded::after {
+  display: none;
+}
+
+.vm.is-exploded .vm-led {
+  background: #3a1d24;
+  box-shadow: none;
+  animation: none;
+}
+
+.vm.is-exploded .vm-name {
+  color: #6f6a2a;
+  text-shadow: none;
+  animation: vm-flicker 2.4s steps(1) infinite;
+}
+
+.vm.is-exploded .vm-shelf {
+  transform: rotate(-1.2deg) translateY(4px);
+  filter: grayscale(0.7) brightness(0.55);
+  transition: transform 300ms ease-out, filter 600ms ease-out 200ms;
+}
+
+.vm.is-exploded .vm-panel {
+  filter: grayscale(0.5) brightness(0.8);
+}
+
+.vm.is-exploded .vm-display {
+  color: var(--vm-red);
+  animation: vm-flicker 1.6s steps(1) infinite;
+}
+
+.vm-cracks-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vm-shelf {
+  position: relative;
+}
+
+.vm-cracks {
+  width: 100%;
+  height: 100%;
+}
+
+.vm-cracks path {
+  fill: none;
+  stroke: rgba(233, 236, 242, 0.75);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: vm-crack 500ms ease-out 150ms forwards;
+}
+
+/* 폭발 효과: 폭심은 꺼내는 곳 */
+.vm-blast {
+  position: absolute;
+  left: 50%;
+  bottom: 90px;
+  z-index: 5;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.vm-blast-flash {
+  position: absolute;
+  left: -160px;
+  top: -160px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 12%, #f3ff1a 24%, rgba(255, 43, 214, 0.6) 45%, transparent 70%);
+  animation: vm-flash 650ms ease-out forwards;
+}
+
+.vm-blast-ring {
+  position: absolute;
+  left: -40px;
+  top: -40px;
+  width: 80px;
+  height: 80px;
+  border: 3px solid var(--vm-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 18px var(--vm-cyan), inset 0 0 18px var(--vm-cyan);
+  opacity: 0;
+  animation: vm-ring 700ms ease-out forwards;
+}
+
+.vm-blast-ring.late {
+  border-color: var(--vm-magenta);
+  box-shadow: 0 0 18px var(--vm-magenta), inset 0 0 18px var(--vm-magenta);
+  animation-delay: 120ms;
+}
+
+.vm-shard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  box-shadow: 0 0 8px currentColor;
+  animation: vm-shard 1100ms cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+.cp-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.9), rgba(243, 255, 26, 0.5) 40%, transparent 75%);
+  animation: cp-flash 600ms ease-out forwards;
+}
+
+@keyframes vm-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  10% { transform: translate(-10px, 4px) rotate(-1.5deg); }
+  20% { transform: translate(12px, -6px) rotate(1.2deg); }
+  30% { transform: translate(-9px, 3px) rotate(-1deg); }
+  45% { transform: translate(7px, -2px) rotate(0.6deg); }
+  60% { transform: translate(-4px, 1px) rotate(-0.3deg); }
+  80% { transform: translate(2px, 0) rotate(0.1deg); }
+}
+
+@keyframes vm-jitter {
+  50% { transform: translate(1px, -1px); }
+}
+
+@keyframes vm-burst {
+  0%   { opacity: 0.4; transform: scale(1); }
+  12%  { opacity: 1; transform: scale(1.25); filter: blur(28px); }
+  100% { opacity: 0.12; transform: scale(1); }
+}
+
+@keyframes vm-flash {
+  0%   { opacity: 0; transform: scale(0.2); }
+  15%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes vm-ring {
+  0%   { opacity: 1; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(7); }
+}
+
+@keyframes vm-shard {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
+}
+
+@keyframes vm-crack {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes vm-flicker {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.35; }
+  44% { opacity: 1; }
+  70% { opacity: 0.6; }
+}
+
+@keyframes cp-flash {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-frame.is-warning .vm-edge,
+  .vm-frame.is-exploded,
+  .vm-frame.is-exploded::before,
+  .vm.is-exploded .vm-name,
+  .vm.is-exploded .vm-display,
+  .vm-tray.warning .vm-load {
+    animation: none;
+  }
+
+  .vm-blast,
+  .cp-flash {
+    display: none;
+  }
+
+  .vm-cracks path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  /* 날아가는 움직임 대신 터진 캔을 바로 감춘다 */
+  .vm.is-exploded .vm-tray-can,
+  .vm.is-exploded .vm-shelf .vm-can {
+    visibility: hidden;
+  }
 }
 
 @keyframes vm-wave {

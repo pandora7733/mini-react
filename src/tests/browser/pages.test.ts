@@ -1013,48 +1013,79 @@ test("자판기: 해킹 전에는 잔액이 부족하고, 해킹하면 고장 �
   page.frame.remove();
 });
 
-test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 한꺼번에 떨어뜨린다", async () => {
+async function brokenMachine() {
   const page = await openPage("./index.html");
   const { doc } = page;
+  // 동작 줄이기 설정이면 해킹 단계가 짧아지고 캔은 애니메이션 없이 바로 놓인다
   page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
-  // 첫 값은 개수(5 + floor(0.99 * 6) = 10개), 나머지는 칸 순서대로 돌아가게 고정한다
-  const rolls = [0.99, 0.0, 0.2, 0.4, 0.6, 0.8, 0.95, 0.0, 0.2, 0.4, 0.6];
-  let roll = 0;
-  page.win.Math.random = () => rolls[roll++ % rolls.length];
-
   $(doc, "#vm-hack").click();
   await until(() => $(doc, ".vm").classList.contains("is-broken"), "해킹이 끝나지 않았습니다.");
+  const idle = async () => {
+    await wait();   // 다시 그리기 전에는 앞선 배출의 버튼 상태가 남아 있다
+    await until(() => doc.querySelector("#vm-random:disabled") === null, "배출이 끝나지 않았습니다.");
+  };
+  return { page, doc, idle };
+}
+
+test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 한꺼번에 떨어뜨린다", async () => {
+  const { page, doc, idle } = await brokenMachine();
   $(doc, "#vm-random").click();
-  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "캔이 나오지 않았습니다.");
+  await idle();
 
   const ids = Array.from(doc.querySelectorAll<HTMLElement>(".vm-tray-can"), can => can.dataset.drinkId);
-  assert.equal(ids.length, 10);
-  assert.equal(new Set(ids).size, 6, "여러 칸에서 섞여 나와야 합니다.");
-  assert.equal($(doc, "#vm-take").textContent, "꺼내기 10개");
+  assert.ok(ids.length >= 8 && ids.length <= 16, `캔 ${ids.length}개`);
+  assert.ok(new Set(ids).size > 1, "여러 칸에서 섞여 나와야 합니다.");
+  assert.equal($(doc, "#vm-take").textContent, `꺼내기 ${ids.length}개`);
+  assert.equal($(doc, "#vm-load").textContent, `적재 ${ids.length}/30`);
 
-  // 꺼내는 곳은 14개까지만 담긴다. 남은 자리만큼만 더 나오고, 가득 차면 버튼이 잠긴다
-  $(doc, "#vm-random").click();
-  await wait();   // 다시 그리기 전에는 앞선 배출의 꺼내기 버튼이 그대로 남아 있다
-  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "두 번째 배출이 끝나지 않았습니다.");
-  assert.equal(doc.querySelectorAll(".vm-tray-can").length, 14);
-  assert.equal(($(doc, "#vm-random") as HTMLButtonElement).disabled, true);
-  assert.equal(($(doc, '[data-drink="neon-cider"]') as HTMLButtonElement).disabled, true);
-  assert.equal($(doc, "#vm-display-text").textContent, "꺼내는 곳이 가득 찼습니다. 먼저 꺼내세요");
+  // 캔은 진열칸과 같은 크기로, 꺼내는 곳 안의 서로 다른 위치에 놓인다
+  const box = $(doc, "#vm-tray-box").getBoundingClientRect();
+  const rects = Array.from(doc.querySelectorAll(".vm-tray-can"), can => can.getBoundingClientRect());
+  assert.ok(rects.every(rect => rect.left >= box.left - 2 && rect.right <= box.right + 2), "꺼내는 곳 안에 있어야 합니다.");
+  assert.ok(rects.every(rect => rect.bottom <= box.bottom + 2), "바닥 아래로 빠지면 안 됩니다.");
+  assert.ok(new Set(rects.map(rect => Math.round(rect.left / 10))).size > 3, "흩어져 놓여야 합니다.");
+  const can = $(doc, ".vm-tray-can");
+  assert.equal(can.offsetWidth, 34);
+  assert.equal(can.offsetHeight, 58);
 
   $(doc, "#vm-take").click();
   await wait();
-  assert.equal($(doc, "#vm-taken").textContent, "14");
-  assert.equal(($(doc, "#vm-random") as HTMLButtonElement).disabled, false);
+  assert.equal($(doc, "#vm-taken").textContent, String(ids.length));
   page.frame.remove();
 });
 
-test("자판기: 캔은 진열칸에서 출발해 꺼내는 곳으로 떨어지는 애니메이션으로 나온다", async () => {
-  const page = await openPage("./index.html");
-  const { doc } = page;
-  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
-  $(doc, "#vm-hack").click();
-  await until(() => $(doc, ".vm").classList.contains("is-broken"), "해킹이 끝나지 않았습니다.");
+test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지고, 새 자판기를 설치할 수 있다", async () => {
+  const { page, doc, idle } = await brokenMachine();
+  const ids = ["chrome-cola", "neon-cider", "synapse", "midnight", "lemonade", "blackout"];
 
+  for (let i = 0; i < 24; i++) $(doc, `[data-drink="${ids[i % ids.length]}"]`).click();
+  await idle();
+  assert.ok($(doc, ".vm-tray").classList.contains("warning"));
+  assert.equal($(doc, "#vm-display-text").textContent, "적재 경고 24/30. 더 담으면 위험합니다");
+
+  for (let i = 0; i < 6; i++) $(doc, `[data-drink="${ids[i]}"]`).click();
+  await idle();
+  assert.ok($(doc, ".vm").classList.contains("is-broken"), "30개까지는 버틴다.");
+
+  $(doc, '[data-drink="synapse"]').click();
+  await until(() => $(doc, ".vm").classList.contains("is-exploded"), "31개째에 터져야 합니다.");
+  assert.ok(doc.querySelector(".vm-blast") !== null);
+  assert.ok(doc.querySelector(".vm-cracks") !== null);
+  assert.equal(doc.querySelector("#vm-take"), null, "터지면 꺼낼 수 없습니다.");
+  assert.equal(($(doc, '[data-drink="synapse"]') as HTMLButtonElement).disabled, true);
+  assert.equal($(doc, "#vm-lost").textContent, "31");
+
+  $(doc, "#vm-install").click();
+  await wait();
+  assert.ok($(doc, ".vm").classList.contains("is-locked"));
+  assert.equal(doc.querySelectorAll(".vm-tray-can").length, 0);
+  assert.equal($(doc, "#vm-load").textContent, "적재 0/30");
+  assert.equal($(doc, "#vm-lost").textContent, "31", "날아간 캔 기록은 남는다.");
+  page.frame.remove();
+});
+
+test("자판기: 캔은 진열칸 그 자리에서 곧장 아래로, 중력처럼 점점 빨라지며 떨어진다", async () => {
+  const { page, doc } = await brokenMachine();
   // 동작 줄이기를 끄고 배출해야 애니메이션이 붙는다
   page.win.matchMedia = (() => ({ matches: false })) as unknown as typeof page.win.matchMedia;
   $(doc, '[data-drink="midnight"]').click();
@@ -1064,13 +1095,25 @@ test("자판기: 캔은 진열칸에서 출발해 꺼내는 곳으로 떨어지�
   assert.ok(animation !== undefined, "떨어지는 애니메이션이 있어야 합니다.");
   assert.equal(($(doc, "#vm-take") as HTMLButtonElement).disabled, true, "떨어지는 동안에는 꺼낼 수 없습니다.");
 
-  // 시작 지점은 고른 칸의 캔 위치다
   animation.pause();
-  animation.currentTime = 0;
-  const start = can.getBoundingClientRect();
+  const sample = (time: number) => {
+    animation.currentTime = time;
+    const rect = can.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: rect.width, h: rect.height };
+  };
   const slot = $(doc, '[data-drink="midnight"] .vm-can').getBoundingClientRect();
-  const gap = Math.hypot(start.left + start.width / 2 - (slot.left + slot.width / 2), start.top + start.height / 2 - (slot.top + slot.height / 2));
-  assert.ok(gap < 6, `진열칸과의 거리 ${gap.toFixed(1)}px`);
+  const [t0, t1, t2, t3] = [0, 80, 160, 240].map(sample);
+
+  // 출발점은 진열칸의 캔, 크기는 1:1
+  assert.ok(Math.abs(t0.x - (slot.left + slot.width / 2)) < 1 && Math.abs(t0.y - (slot.top + slot.height / 2)) < 1, "진열칸에서 출발해야 합니다.");
+  assert.ok(Math.abs(t0.w - slot.width) < 1 && Math.abs(t0.h - slot.height) < 1, "진열칸 캔과 같은 크기여야 합니다.");
+  // 자유 낙하 동안 옆으로 움직이거나 돌지 않는다
+  assert.ok([t1, t2, t3].every(point => Math.abs(point.x - t0.x) < 0.5 && Math.abs(point.w - t0.w) < 0.5), "곧장 아래로 떨어져야 합니다.");
+  // 같은 시간 동안 내려가는 거리가 늘어난다 (등가속도: 1 : 3 : 5)
+  const d1 = t1.y - t0.y;
+  const d2 = t2.y - t1.y;
+  const d3 = t3.y - t2.y;
+  assert.ok(d1 > 0 && d2 > d1 * 2.5 && d3 > d2 * 1.4, `낙하 거리 ${d1.toFixed(1)}, ${d2.toFixed(1)}, ${d3.toFixed(1)}`);
 
   animation.finish();
   await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "애니메이션이 끝나면 꺼낼 수 있어야 합니다.");
