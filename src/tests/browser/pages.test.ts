@@ -953,6 +953,168 @@ test("Phase 2: 다시 열어도 할 일이 저장되어 있다", async () => {
   p.close();
 });
 
+// --- 랜딩: 자판기 ---
+
+async function until(check: () => boolean, message: string): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    if (check()) return;
+    await wait(20);
+  }
+  throw new Error(message);
+}
+
+test("자판기: 해킹 전에는 잔액이 부족하고, 해킹하면 고장 나서 음료를 공짜로 내준다", async () => {
+  const page = await openPage("./index.html");
+  const { doc } = page;
+  // 동작 줄이기 설정이면 해킹 단계와 배출이 짧아진다
+  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
+
+  $(doc, '[data-drink="chrome-cola"]').click();
+  await wait();
+  assert.equal($(doc, "#vm-display-text").textContent, "잔액 부족. A1 크롬 콜라: 1,500 크레딧 필요");
+  assert.ok($(doc, '[data-drink="chrome-cola"]').classList.contains("picked"), "거절된 칸을 표시해야 합니다.");
+  assert.equal(doc.querySelector("#vm-take"), null);
+
+  $(doc, "#vm-hack").click();
+  await wait();
+  assert.ok($(doc, ".vm").classList.contains("is-hacking"));
+  assert.equal(($(doc, '[data-drink="synapse"]') as HTMLButtonElement).disabled, true, "해킹 중에는 고를 수 없습니다.");
+
+  await until(() => $(doc, ".vm").classList.contains("is-broken"), "해킹이 끝나지 않았습니다.");
+  assert.equal(doc.querySelectorAll(".vm-log li.ok").length, 4);
+  assert.equal($(doc, '[data-drink="synapse"] .vm-price-now').textContent, "0");
+
+  // 직접 꺼내기: 누른 칸의 음료가 하나 나온다
+  $(doc, '[data-drink="synapse"]').click();
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "음료가 나오지 않았습니다.");
+  const cans = doc.querySelectorAll<HTMLElement>(".vm-tray-can");
+  assert.equal(cans.length, 1);
+  assert.equal(cans[0].dataset.drinkId, "synapse");
+  assert.equal($(doc, "#vm-take").textContent, "꺼내기 1개");
+  assert.equal(($(doc, "#vm-reboot") as HTMLButtonElement).disabled, true, "꺼내기 전에는 재부팅할 수 없습니다.");
+
+  $(doc, "#vm-take").click();
+  await wait();
+  assert.equal($(doc, "#vm-taken").textContent, "1");
+  assert.equal($(doc, "#vm-balance").textContent, "0");
+
+  $(doc, '[data-drink="synapse"]').click();
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "두 번째 음료가 나오지 않았습니다.");
+  $(doc, "#vm-take").click();
+  await wait();
+  assert.equal($(doc, "#vm-taken").textContent, "2");
+  assert.equal($(doc, ".vm-bag-list").textContent, "시냅스 부스트 2");
+  assert.equal(doc.querySelectorAll(".vm-tray-can").length, 0, "꺼내면 꺼내는 곳이 빈다.");
+
+  $(doc, "#vm-reboot").click();
+  await wait();
+  assert.ok($(doc, ".vm").classList.contains("is-locked"));
+  assert.equal($(doc, '[data-drink="synapse"] .vm-price-now').textContent, "2,400");
+  page.frame.remove();
+});
+
+test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 한꺼번에 떨어뜨린다", async () => {
+  const page = await openPage("./index.html");
+  const { doc } = page;
+  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
+  // 첫 값은 개수(5 + floor(0.99 * 6) = 10개), 나머지는 칸 순서대로 돌아가게 고정한다
+  const rolls = [0.99, 0.0, 0.2, 0.4, 0.6, 0.8, 0.95, 0.0, 0.2, 0.4, 0.6];
+  let roll = 0;
+  page.win.Math.random = () => rolls[roll++ % rolls.length];
+
+  $(doc, "#vm-hack").click();
+  await until(() => $(doc, ".vm").classList.contains("is-broken"), "해킹이 끝나지 않았습니다.");
+  $(doc, "#vm-random").click();
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "캔이 나오지 않았습니다.");
+
+  const ids = Array.from(doc.querySelectorAll<HTMLElement>(".vm-tray-can"), can => can.dataset.drinkId);
+  assert.equal(ids.length, 10);
+  assert.equal(new Set(ids).size, 6, "여러 칸에서 섞여 나와야 합니다.");
+  assert.equal($(doc, "#vm-take").textContent, "꺼내기 10개");
+
+  // 꺼내는 곳은 14개까지만 담긴다. 남은 자리만큼만 더 나오고, 가득 차면 버튼이 잠긴다
+  $(doc, "#vm-random").click();
+  await wait();   // 다시 그리기 전에는 앞선 배출의 꺼내기 버튼이 그대로 남아 있다
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "두 번째 배출이 끝나지 않았습니다.");
+  assert.equal(doc.querySelectorAll(".vm-tray-can").length, 14);
+  assert.equal(($(doc, "#vm-random") as HTMLButtonElement).disabled, true);
+  assert.equal(($(doc, '[data-drink="neon-cider"]') as HTMLButtonElement).disabled, true);
+  assert.equal($(doc, "#vm-display-text").textContent, "꺼내는 곳이 가득 찼습니다. 먼저 꺼내세요");
+
+  $(doc, "#vm-take").click();
+  await wait();
+  assert.equal($(doc, "#vm-taken").textContent, "14");
+  assert.equal(($(doc, "#vm-random") as HTMLButtonElement).disabled, false);
+  page.frame.remove();
+});
+
+test("자판기: 캔은 진열칸에서 출발해 꺼내는 곳으로 떨어지는 애니메이션으로 나온다", async () => {
+  const page = await openPage("./index.html");
+  const { doc } = page;
+  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
+  $(doc, "#vm-hack").click();
+  await until(() => $(doc, ".vm").classList.contains("is-broken"), "해킹이 끝나지 않았습니다.");
+
+  // 동작 줄이기를 끄고 배출해야 애니메이션이 붙는다
+  page.win.matchMedia = (() => ({ matches: false })) as unknown as typeof page.win.matchMedia;
+  $(doc, '[data-drink="midnight"]').click();
+  await wait();
+  const can = $(doc, ".vm-tray-can");
+  const [animation] = can.getAnimations();
+  assert.ok(animation !== undefined, "떨어지는 애니메이션이 있어야 합니다.");
+  assert.equal(($(doc, "#vm-take") as HTMLButtonElement).disabled, true, "떨어지는 동안에는 꺼낼 수 없습니다.");
+
+  // 시작 지점은 고른 칸의 캔 위치다
+  animation.pause();
+  animation.currentTime = 0;
+  const start = can.getBoundingClientRect();
+  const slot = $(doc, '[data-drink="midnight"] .vm-can').getBoundingClientRect();
+  const gap = Math.hypot(start.left + start.width / 2 - (slot.left + slot.width / 2), start.top + start.height / 2 - (slot.top + slot.height / 2));
+  assert.ok(gap < 6, `진열칸과의 거리 ${gap.toFixed(1)}px`);
+
+  animation.finish();
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "애니메이션이 끝나면 꺼낼 수 있어야 합니다.");
+  page.frame.remove();
+});
+
+test("자판기: 헤더 왼쪽 버튼으로 사이드바를 열고 Esc로 닫는다", async () => {
+  const page = await openPage("./index.html");
+  const { doc } = page;
+  const menu = $(doc, "#cp-menu-btn");
+  const sidebar = $(doc, "#cp-sidebar");
+  assert.equal(menu.getAttribute("aria-expanded"), "false");
+  assert.equal(page.win.getComputedStyle(sidebar).visibility, "hidden");
+
+  menu.click();
+  await wait();
+  assert.equal(menu.getAttribute("aria-expanded"), "true");
+  assert.ok(sidebar.classList.contains("open"));
+  assert.equal(doc.activeElement?.id, "cp-sidebar-close");
+
+  doc.dispatchEvent(new (page.win as typeof globalThis).KeyboardEvent("keydown", { key: "Escape" }));
+  await wait();
+  assert.equal(menu.getAttribute("aria-expanded"), "false");
+  assert.equal(doc.activeElement?.id, "cp-menu-btn");
+
+  menu.click();
+  await wait();
+  $(doc, ".cp-scrim").click();
+  await wait();
+  assert.equal(sidebar.classList.contains("open"), false, "바깥을 누르면 닫혀야 합니다.");
+  page.frame.remove();
+});
+
+test("자판기: 다른 페이지로 떠나면 랜딩 전용 배경과 글꼴을 뗀다", async () => {
+  const page = await openPage("./index.html");
+  assert.ok(page.doc.body.classList.contains("cp-body"));
+  assert.ok(page.doc.getElementById("cp-fonts") !== null);
+  $(page.doc, '.cp-nav a[href="#/phase2"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(page.doc.body.classList.contains("cp-body"), false);
+  assert.equal(page.doc.getElementById("cp-fonts"), null);
+  page.frame.remove();
+});
+
 // --- 면접 노트 ---
 
 test("면접 노트: 홈의 카드로 들어가면 목차와 모든 절을 그린다", async () => {

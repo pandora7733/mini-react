@@ -1083,3 +1083,1202 @@ a.budget-button:hover {
     display: none;
   }
 }
+
+/* ===== 랜딩: 자판기 (design/cyberpunk2077/README.md) ===== */
+
+.cp,
+.cp-body {
+  --cp-bg: #0c0d12;
+  --cp-surface: #15171f;
+  --cp-text: #e9ecf2;
+  --cp-muted: #8b93a7;
+  --cp-border: #2a2e3b;
+  --cp-accent: #f3e600;
+  --cp-accent-text: #0c0d12;
+  --cp-danger: #ff3b5c;
+  --cp-info: #00e5ff;
+  --cp-glow: 0 0 12px rgba(243, 230, 0, 0.45);
+  --cp-display: "Chakra Petch", "IBM Plex Sans KR", system-ui, sans-serif;
+  --cp-body-font: "IBM Plex Sans KR", system-ui, "Noto Sans KR", sans-serif;
+  --cp-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* 자판기는 화면 속 물건이라 테마와 상관없이 어둡다 */
+  --vm-metal: #000;
+  --vm-inner: #000;
+  --vm-line: rgba(0, 240, 255, 0.22);
+}
+
+@media (prefers-color-scheme: light) {
+  .cp,
+  .cp-body {
+    --cp-bg: #f3e600;
+    --cp-surface: #fff8a6;
+    --cp-text: #111216;
+    --cp-muted: #4d4818;
+    --cp-border: #111216;
+    --cp-accent: #111216;
+    --cp-accent-text: #f3e600;
+    --cp-danger: #b0002a;
+    --cp-info: #00606e;
+    --cp-glow: 0 0 0 transparent;
+  }
+}
+
+.cp-body {
+  background: var(--cp-bg);
+  color: var(--cp-text);
+}
+
+.cp-body.cp-menu-open {
+  overflow: hidden;
+}
+
+.cp {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  font-family: var(--cp-body-font);
+  word-break: keep-all;   /* 한글이 단어 중간에서 줄바꿈되지 않게 한다 */
+  overflow-wrap: anywhere;
+  isolation: isolate;
+}
+
+/* 스캔라인: 아주 옅게, 글자보다 아래에 */
+.cp::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(255, 255, 255, 0.03) 2px 3px);
+}
+
+@media (prefers-color-scheme: light) {
+  .cp::before {
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.035) 2px 3px);
+  }
+}
+
+.cp h1,
+.cp h2 {
+  font-family: var(--cp-display);
+  letter-spacing: 0.02em;
+}
+
+.cp :focus-visible {
+  outline: 2px solid var(--cp-info);
+  outline-offset: 2px;
+}
+
+/* --- 헤더 = 내비게이션 --- */
+
+.cp-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--cp-border);
+  background: color-mix(in srgb, var(--cp-bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.cp-menu-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--cp-border);
+  border-radius: 0;
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  cursor: pointer;
+}
+
+.cp-menu-btn:hover {
+  border-color: var(--cp-accent);
+}
+
+.cp-menu-btn[aria-expanded="true"] {
+  border-color: var(--cp-accent);
+  box-shadow: var(--cp-glow);
+}
+
+/* 세 줄 아이콘. 맨 아래 줄을 짧게 잘라 사선 모서리와 맞춘다 */
+.cp-menu-icon,
+.cp-menu-icon::before,
+.cp-menu-icon::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+}
+
+.cp-menu-icon {
+  position: relative;
+}
+
+.cp-menu-icon::before,
+.cp-menu-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.cp-menu-icon::before {
+  top: -6px;
+}
+
+.cp-menu-icon::after {
+  top: 6px;
+  width: 11px;
+}
+
+.cp-brand {
+  margin-right: auto;
+  color: var(--cp-text);
+  font-family: var(--cp-display);
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cp-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.cp-nav-link {
+  position: relative;
+  padding: 8px 12px;
+  color: var(--cp-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.cp-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--cp-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 160ms ease-out;
+}
+
+.cp-nav-link:hover {
+  color: var(--cp-text);
+}
+
+.cp-nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+@media (max-width: 720px) {
+  .cp-nav {
+    display: none;
+  }
+}
+
+/* --- 사이드바 --- */
+
+.cp-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(360px, 88vw);
+  padding: 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--cp-border);
+  background: var(--cp-bg);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform 220ms ease-out, visibility 0s linear 220ms;
+}
+
+.cp-sidebar.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 220ms ease-out;
+}
+
+.cp-sidebar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 56px;
+  background: var(--cp-accent);
+}
+
+.cp-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+}
+
+.cp-sidebar-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.cp-sidebar .link-card {
+  border: 0;
+  border-radius: 0;
+  border-left: 2px solid var(--cp-border);
+  background: var(--cp-surface);
+  color: var(--cp-text);
+}
+
+.cp-sidebar .link-card strong {
+  font-family: var(--cp-display);
+}
+
+.cp-sidebar .link-card span {
+  color: var(--cp-muted);
+}
+
+.cp-sidebar .link-card:hover {
+  border-left-color: var(--cp-accent);
+}
+
+.cp-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(5, 6, 10, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease-out;
+}
+
+.cp-scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* --- 버튼 --- */
+
+.cp-primary,
+.cp-ghost {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 0;
+  font-family: var(--cp-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+
+/* clip-path가 바깥 윤곽선을 자르므로 포커스 표시를 안쪽에 그린다 */
+.cp-primary:focus-visible,
+.cp-ghost:focus-visible {
+  outline-offset: -5px;
+}
+
+.cp-primary {
+  border: 0;
+  background: var(--cp-accent);
+  color: var(--cp-accent-text);
+}
+
+.cp-primary:hover:not(:disabled) {
+  box-shadow: var(--cp-glow);
+  filter: brightness(1.08);
+}
+
+.cp-primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.cp-ghost {
+  border: 1px solid var(--cp-border);
+  background: transparent;
+  color: var(--cp-text);
+}
+
+.cp-ghost:hover:not(:disabled) {
+  border-color: var(--cp-accent);
+}
+
+.cp-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- 히어로 --- */
+
+.cp-main {
+  display: grid;
+  align-content: center;
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 16px 56px;
+}
+
+.cp-footer {
+  padding: 16px;
+  border-top: 1px solid var(--cp-border);
+  color: var(--cp-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.cp-footer p {
+  max-width: 60em;
+  margin: 0 auto;
+}
+
+.cp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 40px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .cp-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+.cp-copy h1 {
+  margin: 0 0 16px;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.cp-copy p {
+  max-width: 34em;
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.cp-copy .cp-sub {
+  color: var(--cp-muted);
+  font-size: 15px;
+}
+
+.cp-steps {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.cp-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--cp-muted);
+  counter-increment: step;
+}
+
+.cp-steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--cp-border);
+  font-family: var(--cp-display);
+  font-size: 14px;
+}
+
+.cp-steps li.done {
+  color: var(--cp-text);
+}
+
+.cp-steps li.done::before {
+  content: "✓";
+  border-color: var(--cp-text);
+}
+
+.cp-steps li.current {
+  color: var(--cp-text);
+  font-weight: 600;
+}
+
+.cp-steps li.current::before {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent);
+  color: var(--cp-accent-text);
+}
+
+/* --- 자판기 --- */
+
+/* 자판기: 검은 바탕 + 형광 테두리와 발광 + 전자기파. 상태마다 신호색(--vm-signal)이 바뀐다 */
+.vm-frame {
+  --vm-text: #e9ecf2;
+  --vm-muted: #8b93a7;
+  --vm-yellow: #f3ff1a;
+  --vm-cyan: #00f0ff;
+  --vm-magenta: #ff2bd6;
+  --vm-red: #ff3b5c;
+  --vm-signal: var(--vm-cyan);
+  --vm-cut: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+  position: relative;
+  isolation: isolate;
+}
+
+.vm-frame.is-hacking {
+  --vm-signal: var(--vm-yellow);
+}
+
+.vm-frame.is-broken {
+  --vm-signal: var(--vm-red);
+}
+
+/* 번지는 빛: 흐림 필터는 움직이지 않는 별도 층에만 걸어 매 프레임 다시 그리지 않게 한다 */
+.vm-frame::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  background: linear-gradient(135deg, var(--vm-signal), var(--vm-magenta) 55%, var(--vm-signal));
+  filter: blur(18px);
+  opacity: 0.4;
+  animation: vm-pulse 3.2s ease-in-out infinite;
+}
+
+.vm-frame.is-hacking::before {
+  animation-duration: 0.9s;
+}
+
+.vm-edge {
+  padding: 1px;
+  background: linear-gradient(135deg, var(--vm-signal), var(--vm-magenta) 50%, var(--vm-signal));
+  clip-path: var(--vm-cut);
+}
+
+.vm {
+  position: relative;
+  padding: 16px;
+  /* 옅은 격자: 측정 장비의 눈금 */
+  background:
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    #000;
+  color: var(--vm-text);
+  clip-path: var(--vm-cut);
+}
+
+/* 전자기 스윕: 밝은 띠가 위에서 아래로 기계를 훑고 지나간다 */
+.vm::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 30%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vm-signal) 14%, transparent) 70%, color-mix(in srgb, var(--vm-signal) 45%, transparent) 99%, transparent);
+  mix-blend-mode: screen;
+  animation: vm-sweep 4.5s linear infinite;
+}
+
+.vm.is-hacking::after {
+  animation-duration: 1.2s;
+}
+
+.vm-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vm-line);
+}
+
+.vm-name {
+  margin-right: auto;
+  color: var(--vm-yellow);
+  font-family: var(--cp-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.vm-led {
+  width: 10px;
+  height: 10px;
+  background: var(--vm-cyan);
+  box-shadow: 0 0 8px var(--vm-cyan);
+}
+
+.vm.is-hacking .vm-led {
+  background: var(--vm-yellow);
+  box-shadow: 0 0 8px var(--vm-yellow);
+}
+
+.vm.is-broken .vm-led {
+  background: var(--vm-red);
+  box-shadow: 0 0 8px var(--vm-red);
+  animation: vm-blink 1s steps(2) infinite;
+}
+
+.vm-state {
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm.is-broken .vm-state {
+  color: var(--vm-red);
+}
+
+.vm-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .vm-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vm-shelf {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--vm-line);
+  background: var(--vm-line);
+  list-style: none;
+}
+
+@media (max-width: 400px) {
+  .vm-shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.vm-item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 14px 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: var(--vm-inner);
+  color: var(--vm-text);
+  text-align: center;
+  cursor: pointer;
+}
+
+.vm-item:hover:not(:disabled) {
+  background: #000;
+  box-shadow: inset 0 0 0 1px var(--vm-cyan), inset 0 0 18px rgba(0, 240, 255, 0.28);
+}
+
+.vm-item:hover:not(:disabled) .vm-can {
+  transform: translateY(-3px);
+}
+
+.vm-item:focus-visible {
+  outline: 2px solid var(--vm-cyan);
+  outline-offset: -2px;
+}
+
+/* 전역 button:disabled는 버튼 전체를 흐리게 하므로, 자판기 칸은 내용만 흐린다 */
+.vm-item:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.vm-item:disabled:not(.picked) > * {
+  opacity: 0.5;
+}
+
+.vm-code {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  color: var(--vm-muted);
+  font-family: var(--cp-mono);
+  font-size: 11px;
+}
+
+/* 고른 칸: 잔액이 부족하면 빨간색, 배출 중이면 노란색 테두리 */
+.vm-item.picked {
+  box-shadow: inset 0 0 0 2px var(--vm-yellow);
+}
+
+.vm-item.picked .vm-code {
+  color: var(--vm-yellow);
+}
+
+.vm.is-locked .vm-item.picked {
+  box-shadow: inset 0 0 0 2px var(--vm-red);
+}
+
+.vm.is-locked .vm-item.picked .vm-code {
+  color: var(--vm-red);
+}
+
+.vm-can {
+  display: block;
+  position: relative;
+  width: 34px;
+  height: 58px;
+  margin-bottom: 8px;
+  border-radius: 4px 4px 3px 3px;
+  transition: transform 140ms ease-out;
+}
+
+/* 캔 위 뚜껑과 가운데 띠 */
+.vm-can::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  border-radius: 2px 2px 0 0;
+  background: #a9afbd;
+}
+
+.vm-can::after {
+  content: "";
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  height: 9px;
+  background: rgba(10, 11, 16, 0.55);
+}
+
+.vm-can.small {
+  width: 22px;
+  height: 38px;
+  margin: 0;
+}
+
+.vm-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.vm-item-note {
+  color: var(--vm-muted);
+  font-size: 12px;
+}
+
+.vm-price {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 4px;
+  font-family: var(--cp-display);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-price s {
+  color: var(--vm-muted);
+  font-size: 12px;
+}
+
+.vm.is-broken .vm-price-now {
+  color: var(--vm-yellow);
+}
+
+.vm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vm-display {
+  min-height: 72px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--vm-line);
+  background: #000;
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vm-signal) 22%, transparent);
+  color: var(--vm-signal);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--vm-signal) 70%, transparent);
+  font-family: var(--cp-mono);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vm.is-broken .vm-display {
+  color: var(--vm-red);
+}
+
+.vm-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: vm-blink 1s steps(2) infinite;
+}
+
+.vm-credit {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--vm-muted);
+  font-size: 14px;
+}
+
+.vm-credit dd {
+  margin: 0;
+  color: var(--vm-text);
+  font-family: var(--cp-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.vm .cp-primary {
+  background: var(--vm-yellow);
+  color: #0c0d12;
+}
+
+.vm .cp-ghost {
+  border-color: var(--vm-line);
+  color: var(--vm-text);
+}
+
+.vm .cp-ghost:hover:not(:disabled) {
+  border-color: var(--vm-yellow);
+}
+
+.vm-log {
+  display: grid;
+  gap: 8px;
+  font-family: var(--cp-mono);
+  font-size: 12px;
+}
+
+.vm-progress {
+  height: 4px;
+  background: var(--vm-line);
+}
+
+.vm-progress-fill {
+  height: 100%;
+  background: var(--vm-yellow);
+  transition: width 200ms linear;
+}
+
+.vm-log ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vm-log li {
+  color: var(--vm-muted);
+}
+
+.vm-log li::before {
+  content: "[  ] ";
+  white-space: pre;
+}
+
+.vm-log li.ok {
+  color: var(--vm-text);
+}
+
+.vm-log li.ok::before {
+  content: "[OK] ";
+  color: var(--vm-cyan);
+}
+
+.vm-log li.run::before {
+  content: "[..] ";
+  color: var(--vm-yellow);
+}
+
+.vm-tray {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--vm-line);
+  background: var(--vm-inner);
+}
+
+.vm-tray-label {
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-tray-empty {
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-tray-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 14px 4px 8px;
+  border: 1px solid var(--vm-yellow);
+  border-radius: 0;
+  background: transparent;
+  color: var(--vm-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vm-tray-item:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(243, 230, 0, 0.45);
+}
+
+.vm-tray-item:disabled {
+  border-color: var(--vm-line);
+  color: var(--vm-muted);
+  cursor: wait;
+}
+
+.vm-tray-item.dropping .vm-can {
+  animation: vm-drop 520ms cubic-bezier(0.3, 0, 0.6, 1.4) both;
+}
+
+.vm-bag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 10px;
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-bag p {
+  margin: 0;
+}
+
+.vm-bag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vm-bag-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--vm-line);
+  color: var(--vm-text);
+}
+
+.vm-bag-count {
+  color: var(--vm-yellow);
+  font-family: var(--cp-display);
+}
+
+.vm-can.tiny {
+  width: 8px;
+  height: 14px;
+  margin: 0;
+  border-radius: 1px;
+}
+
+.vm-can.tiny::before,
+.vm-can.tiny::after {
+  display: none;
+}
+
+.vm-bag strong {
+  color: var(--vm-text);
+  font-family: var(--cp-display);
+}
+
+/* 화면의 유일한 큰 효과: 고장 나는 순간 한 번만 흔들린다 */
+.vm.is-broken .vm-shelf {
+  animation: vm-glitch 420ms steps(3) 1;
+}
+
+@keyframes vm-glitch {
+  0%   { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
+  25%  { transform: translate(-4px, 1px); clip-path: inset(8% 0 55% 0); filter: hue-rotate(90deg); }
+  50%  { transform: translate(4px, -2px); clip-path: inset(48% 0 12% 0); filter: hue-rotate(-60deg); }
+  75%  { transform: translate(-2px, 0); clip-path: inset(20% 0 30% 0); }
+  100% { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
+}
+
+@keyframes vm-drop {
+  from { transform: translateY(-36px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes vm-blink {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm.is-broken .vm-shelf,
+  .vm.is-broken .vm-led,
+  .vm-cursor,
+  .vm-tray-item.dropping .vm-can {
+    animation: none;
+  }
+
+  .cp-sidebar,
+  .cp-sidebar.open,
+  .cp-scrim,
+  .vm-can,
+  .vm-progress-fill,
+  .cp-nav-link::after {
+    transition: none;
+  }
+}
+
+/* --- 자판기: 전자기파 파형과 형광 강조 --- */
+
+.vm-name {
+  text-shadow: 0 0 8px rgba(243, 255, 26, 0.6);
+}
+
+.vm-signal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 12px;
+}
+
+.vm-wave {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  overflow: hidden;
+  filter: drop-shadow(0 0 3px var(--vm-signal));
+}
+
+.vm-wave-line {
+  fill: none;
+  stroke: var(--vm-signal);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  animation: vm-wave 3s linear infinite;
+}
+
+/* 세 파형이 서로 다른 속도와 방향으로 흘러 간섭 무늬를 만든다 */
+.vm-wave-line.w2 {
+  stroke: var(--vm-magenta);
+  opacity: 0.7;
+  animation-duration: 2.1s;
+  animation-direction: reverse;
+}
+
+.vm-wave-line.w3 {
+  opacity: 0.35;
+  stroke-width: 1;
+  animation-duration: 6s;
+}
+
+.vm.is-hacking .vm-wave-line {
+  animation-duration: 0.7s;
+}
+
+.vm.is-hacking .vm-wave-line.w2 {
+  animation-duration: 0.45s;
+}
+
+.vm-wave-noise {
+  display: none;
+}
+
+.vm.is-broken .vm-wave-sine {
+  display: none;
+}
+
+.vm.is-broken .vm-wave-noise {
+  display: inline;
+}
+
+.vm.is-broken .vm-wave-line {
+  animation: vm-wave 0.9s steps(6) infinite, vm-blink 0.35s steps(2) 3;
+}
+
+.vm-signal-reading {
+  flex: none;
+  min-width: 6.5em;
+  color: var(--vm-signal);
+  font-family: var(--cp-mono);
+  font-size: 12px;
+  text-align: right;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--vm-signal) 70%, transparent);
+}
+
+.vm-price-now {
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.35);
+}
+
+.vm.is-broken .vm-price-now {
+  text-shadow: 0 0 8px rgba(243, 255, 26, 0.75);
+}
+
+.vm-item.picked {
+  box-shadow: inset 0 0 0 2px var(--vm-yellow), inset 0 0 22px rgba(243, 255, 26, 0.3);
+}
+
+.vm.is-locked .vm-item.picked {
+  box-shadow: inset 0 0 0 2px var(--vm-red), inset 0 0 22px rgba(255, 59, 92, 0.3);
+}
+
+.vm .cp-primary {
+  background: var(--vm-yellow);
+  box-shadow: 0 0 16px rgba(243, 255, 26, 0.45);
+}
+
+.vm-progress-fill {
+  background: var(--vm-yellow);
+  box-shadow: 0 0 8px var(--vm-yellow);
+}
+
+.vm-tray-item {
+  border-color: var(--vm-yellow);
+  box-shadow: inset 0 0 12px rgba(243, 255, 26, 0.2);
+}
+
+/* --- 자판기: 배출 방식과 꺼내는 곳의 캔 더미 --- */
+
+.vm-modes {
+  display: grid;
+  gap: 8px;
+}
+
+.vm-hint {
+  margin: 0;
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-tray {
+  align-items: flex-end;
+  min-height: 76px;
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
+}
+
+.vm-tray.filled {
+  border-color: color-mix(in srgb, var(--vm-yellow) 70%, transparent);
+  box-shadow: inset 0 -10px 24px rgba(243, 255, 26, 0.08);
+}
+
+.vm-tray-label {
+  align-self: center;
+}
+
+.vm-tray-pile {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap-reverse;   /* 새 줄이 위로 쌓여 더미처럼 보인다 */
+  align-items: flex-end;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 12px 2px 4px;
+}
+
+.vm-tray-empty {
+  align-self: center;
+}
+
+/* 바닥에 누운 캔 */
+.vm-tray-can {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 26px;
+  margin: 0 -12px -6px 0;
+  border-radius: 3px 4px 4px 3px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+  will-change: transform;
+}
+
+.vm-tray-can::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -3px;
+  width: 4px;
+  border-radius: 2px 0 0 2px;
+  background: #a9afbd;
+}
+
+.vm-tray-can::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 40%;
+  width: 8px;
+  background: rgba(10, 11, 16, 0.55);
+}
+
+.vm-tray-item {
+  flex: none;
+  align-self: center;
+}
+
+@keyframes vm-wave {
+  to { transform: translateX(-400px); }
+}
+
+@keyframes vm-sweep {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(340%); }
+}
+
+@keyframes vm-pulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-frame::before,
+  .vm::after,
+  .vm-wave-line,
+  .vm.is-broken .vm-wave-line {
+    animation: none;
+  }
+
+  .vm::after {
+    display: none;
+  }
+}
