@@ -1086,41 +1086,24 @@ a.budget-button:hover {
 
 /* ===== 랜딩: 자판기 (design/cyberpunk2077/README.md) ===== */
 
+/* 배경의 노란 전자기장이 보이도록 랜딩은 밝은 테마에서도 밤의 도시(어두운 테마)로 고정한다 */
 .cp,
 .cp-body {
-  --cp-bg: #0c0d12;
-  --cp-surface: #15171f;
+  --cp-bg: #07080c;
+  --cp-surface: #12141b;
   --cp-text: #e9ecf2;
   --cp-muted: #8b93a7;
-  --cp-border: #2a2e3b;
+  --cp-border: #262a36;
   --cp-accent: #f3e600;
   --cp-accent-text: #0c0d12;
   --cp-danger: #ff3b5c;
   --cp-info: #00e5ff;
   --cp-glow: 0 0 12px rgba(243, 230, 0, 0.45);
+  --cp-field: #f3ff1a;
   --cp-display: "Chakra Petch", "IBM Plex Sans KR", system-ui, sans-serif;
   --cp-body-font: "IBM Plex Sans KR", system-ui, "Noto Sans KR", sans-serif;
   --cp-mono: "JetBrains Mono", ui-monospace, monospace;
-  /* 자판기는 화면 속 물건이라 테마와 상관없이 어둡다 */
-  --vm-metal: #000;
-  --vm-inner: #000;
-  --vm-line: rgba(0, 240, 255, 0.22);
-}
-
-@media (prefers-color-scheme: light) {
-  .cp,
-  .cp-body {
-    --cp-bg: #f3e600;
-    --cp-surface: #fff8a6;
-    --cp-text: #111216;
-    --cp-muted: #4d4818;
-    --cp-border: #111216;
-    --cp-accent: #111216;
-    --cp-accent-text: #f3e600;
-    --cp-danger: #b0002a;
-    --cp-info: #00606e;
-    --cp-glow: 0 0 0 transparent;
-  }
+  color-scheme: dark;
 }
 
 .cp-body {
@@ -1134,7 +1117,7 @@ a.budget-button:hover {
 
 .cp {
   position: relative;
-  overflow: clip;   /* 폭발로 날아간 캔이 가로 스크롤을 만들지 않게 한다 */
+  overflow: clip;   /* 폭발로 날아간 캔과 파편이 스크롤을 만들지 않게 한다 */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -1144,6 +1127,14 @@ a.budget-button:hover {
   word-break: keep-all;   /* 한글이 단어 중간에서 줄바꿈되지 않게 한다 */
   overflow-wrap: anywhere;
   isolation: isolate;
+}
+
+.cp.is-alert {
+  --cp-field: #ff2340;
+}
+
+.cp.is-wrecked {
+  --cp-field: #5a1420;
 }
 
 /* 스캔라인: 아주 옅게, 글자보다 아래에 */
@@ -1156,12 +1147,6 @@ a.budget-button:hover {
   background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(255, 255, 255, 0.03) 2px 3px);
 }
 
-@media (prefers-color-scheme: light) {
-  .cp::before {
-    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.035) 2px 3px);
-  }
-}
-
 .cp h1,
 .cp h2 {
   font-family: var(--cp-display);
@@ -1171,6 +1156,106 @@ a.budget-button:hover {
 .cp :focus-visible {
   outline: 2px solid var(--cp-info);
   outline-offset: 2px;
+}
+
+.cp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- 배경 전자기장 --- */
+
+.cp-field {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 400ms ease-out;
+}
+
+.cp-field svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cp-field-wave {
+  animation: cp-field-flow 18s linear infinite;
+}
+
+.cp-field-wave.f2 {
+  animation-duration: 26s;
+  animation-direction: reverse;
+}
+
+.cp-field-wave.f3 {
+  animation-duration: 11s;
+}
+
+.cp-field-line,
+.cp-field-glow {
+  fill: none;
+  stroke: var(--cp-field);
+  vector-effect: non-scaling-stroke;
+  transition: stroke 500ms ease-out;
+}
+
+.cp-field-line {
+  stroke-width: 1.4;
+  opacity: 0.34;
+}
+
+.cp-field-glow {
+  stroke-width: 9;
+  opacity: 0.06;
+}
+
+/* 해킹하면 장이 빨갛게 바뀌고 빠르게 요동친다 */
+.cp.is-alert .cp-field-wave {
+  animation-duration: 5s;
+}
+
+.cp.is-alert .cp-field-wave.f2 {
+  animation-duration: 3.4s;
+}
+
+.cp.is-alert .cp-field-wave.f3 {
+  animation-duration: 2.2s;
+}
+
+.cp.is-alert .cp-field-line {
+  opacity: 0.45;
+}
+
+.cp.is-alert .cp-field svg {
+  animation: cp-field-jitter 0.3s steps(2) infinite;
+}
+
+.cp.is-wrecked .cp-field-wave {
+  animation-play-state: paused;
+}
+
+.cp.is-wrecked .cp-field {
+  animation: vm-flicker 2.2s steps(1) infinite;
+}
+
+.cp-field-pulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 72% 55%, color-mix(in srgb, var(--cp-field) 16%, transparent), transparent 60%);
+  animation: vm-pulse 4s ease-in-out infinite;
+}
+
+@keyframes cp-field-flow {
+  to { transform: translateX(-1600px); }
+}
+
+@keyframes cp-field-jitter {
+  50% { transform: translateY(2px); }
 }
 
 /* --- 헤더 = 내비게이션 --- */
@@ -1530,20 +1615,61 @@ a.budget-button:hover {
   color: var(--cp-accent-text);
 }
 
-/* --- 자판기 --- */
+/* --- 헤더의 크레딧 --- */
 
-/* 자판기: 검은 바탕 + 형광 테두리와 발광 + 전자기파. 상태마다 신호색(--vm-signal)이 바뀐다 */
-.vm-frame {
+.cp-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  color: var(--cp-accent);
+  font-family: var(--cp-display);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cp-credit-coin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbb0, #f3e600 55%, #8f8400);
+  box-shadow: 0 0 6px rgba(243, 230, 0, 0.6);
+}
+
+/* 부서질 때 밀려나고 수리하면 돌아오는 요소들. 변위는 인라인 transform으로 들어온다 */
+.dmg {
+  transition: transform 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cp.is-breaking .dmg {
+  transition: transform 950ms cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+/* --- 자판기 (미국식 캐비닛) --- */
+
+.vm-unit {
   --vm-text: #e9ecf2;
   --vm-muted: #8b93a7;
   --vm-yellow: #f3ff1a;
   --vm-cyan: #00f0ff;
   --vm-magenta: #ff2bd6;
   --vm-red: #ff3b5c;
+  --vm-line: rgba(0, 240, 255, 0.22);
+  --vm-steel: linear-gradient(180deg, #2a2e3b, #161820 40%, #1d2029);
+  min-width: 0;
+}
+
+.vm-frame {
   --vm-signal: var(--vm-cyan);
-  --vm-cut: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+  --vm-cut: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%);
   position: relative;
   isolation: isolate;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 .vm-frame.is-hacking {
@@ -1561,7 +1687,7 @@ a.budget-button:hover {
   inset: -2px;
   z-index: -1;
   background: linear-gradient(135deg, var(--vm-signal), var(--vm-magenta) 55%, var(--vm-signal));
-  filter: blur(18px);
+  filter: blur(20px);
   opacity: 0.4;
   animation: vm-pulse 3.2s ease-in-out infinite;
 }
@@ -1571,19 +1697,21 @@ a.budget-button:hover {
 }
 
 .vm-edge {
-  padding: 1px;
+  padding: 2px;
   background: linear-gradient(135deg, var(--vm-signal), var(--vm-magenta) 50%, var(--vm-signal));
   clip-path: var(--vm-cut);
 }
 
+/* 캐비닛: 검은 강판 + 옅은 눈금 */
 .vm {
   position: relative;
-  padding: 16px;
-  /* 옅은 격자: 측정 장비의 눈금 */
+  display: grid;
+  gap: 10px;
+  padding: 12px 12px 0;
   background:
-    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
-    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
-    #000;
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, #050608, #0c0e14 50%, #050608);
   color: var(--vm-text);
   clip-path: var(--vm-cut);
 }
@@ -1597,7 +1725,7 @@ a.budget-button:hover {
   top: 0;
   height: 30%;
   pointer-events: none;
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vm-signal) 14%, transparent) 70%, color-mix(in srgb, var(--vm-signal) 45%, transparent) 99%, transparent);
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vm-signal) 12%, transparent) 70%, color-mix(in srgb, var(--vm-signal) 40%, transparent) 99%, transparent);
   mix-blend-mode: screen;
   animation: vm-sweep 4.5s linear infinite;
 }
@@ -1606,22 +1734,31 @@ a.budget-button:hover {
   animation-duration: 1.2s;
 }
 
+/* 위쪽 조명 간판 */
+.vm-sign {
+  padding: 10px 12px 4px;
+  border: 1px solid color-mix(in srgb, var(--vm-signal) 60%, transparent);
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--vm-magenta) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, #14061a, #050608);
+  box-shadow: inset 0 0 22px color-mix(in srgb, var(--vm-signal) 22%, transparent);
+  transform-origin: 8% 0%;   /* 부서지면 왼쪽 위 나사 하나에 매달린다 */
+}
+
 .vm-top {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--vm-line);
 }
 
 .vm-name {
   margin-right: auto;
   color: var(--vm-yellow);
   font-family: var(--cp-display);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px rgba(243, 255, 26, 0.7), 0 0 22px rgba(255, 43, 214, 0.35);
 }
 
 .vm-led {
@@ -1647,445 +1784,21 @@ a.budget-button:hover {
   font-size: 13px;
 }
 
-.vm.is-broken .vm-state {
+.vm.is-broken .vm-state,
+.vm.is-exploded .vm-state {
   color: var(--vm-red);
-}
-
-.vm-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 12px;
-}
-
-@media (max-width: 600px) {
-  .vm-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.vm-shelf {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--vm-line);
-  background: var(--vm-line);
-  list-style: none;
-}
-
-@media (max-width: 400px) {
-  .vm-shelf {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.vm-item {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  width: 100%;
-  height: 100%;
-  padding: 14px 6px 10px;
-  border: 0;
-  border-radius: 0;
-  background: var(--vm-inner);
-  color: var(--vm-text);
-  text-align: center;
-  cursor: pointer;
-}
-
-.vm-item:hover:not(:disabled) {
-  background: #000;
-  box-shadow: inset 0 0 0 1px var(--vm-cyan), inset 0 0 18px rgba(0, 240, 255, 0.28);
-}
-
-.vm-item:hover:not(:disabled) .vm-can {
-  transform: translateY(-3px);
-}
-
-.vm-item:focus-visible {
-  outline: 2px solid var(--vm-cyan);
-  outline-offset: -2px;
-}
-
-/* 전역 button:disabled는 버튼 전체를 흐리게 하므로, 자판기 칸은 내용만 흐린다 */
-.vm-item:disabled {
-  opacity: 1;
-  cursor: not-allowed;
-}
-
-.vm-item:disabled:not(.picked) > * {
-  opacity: 0.5;
-}
-
-.vm-code {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  color: var(--vm-muted);
-  font-family: var(--cp-mono);
-  font-size: 11px;
-}
-
-/* 고른 칸: 잔액이 부족하면 빨간색, 배출 중이면 노란색 테두리 */
-.vm-item.picked {
-  box-shadow: inset 0 0 0 2px var(--vm-yellow);
-}
-
-.vm-item.picked .vm-code {
-  color: var(--vm-yellow);
-}
-
-.vm.is-locked .vm-item.picked {
-  box-shadow: inset 0 0 0 2px var(--vm-red);
-}
-
-.vm.is-locked .vm-item.picked .vm-code {
-  color: var(--vm-red);
-}
-
-.vm-can {
-  display: block;
-  position: relative;
-  width: 34px;
-  height: 58px;
-  margin-bottom: 8px;
-  border-radius: 4px 4px 3px 3px;
-  transition: transform 140ms ease-out;
-}
-
-/* 캔 위 뚜껑과 가운데 띠 */
-.vm-can::before {
-  content: "";
-  position: absolute;
-  top: -3px;
-  left: 4px;
-  right: 4px;
-  height: 4px;
-  border-radius: 2px 2px 0 0;
-  background: #a9afbd;
-}
-
-.vm-can::after {
-  content: "";
-  position: absolute;
-  top: 40%;
-  left: 0;
-  right: 0;
-  height: 9px;
-  background: rgba(10, 11, 16, 0.55);
-}
-
-.vm-can.small {
-  width: 22px;
-  height: 38px;
-  margin: 0;
-}
-
-.vm-item-name {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.vm-item-note {
-  color: var(--vm-muted);
-  font-size: 12px;
-}
-
-.vm-price {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  margin-top: 4px;
-  font-family: var(--cp-display);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-}
-
-.vm-price s {
-  color: var(--vm-muted);
-  font-size: 12px;
-}
-
-.vm.is-broken .vm-price-now {
-  color: var(--vm-yellow);
-}
-
-.vm-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.vm-display {
-  min-height: 72px;
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--vm-line);
-  background: #000;
-  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vm-signal) 22%, transparent);
-  color: var(--vm-signal);
-  text-shadow: 0 0 6px color-mix(in srgb, var(--vm-signal) 70%, transparent);
-  font-family: var(--cp-mono);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.vm.is-broken .vm-display {
-  color: var(--vm-red);
-}
-
-.vm-cursor {
-  display: inline-block;
-  width: 8px;
-  height: 1.1em;
-  margin-left: 4px;
-  vertical-align: text-bottom;
-  background: currentColor;
-  animation: vm-blink 1s steps(2) infinite;
-}
-
-.vm-credit {
-  display: flex;
-  justify-content: space-between;
-  margin: 0;
-  color: var(--vm-muted);
-  font-size: 14px;
-}
-
-.vm-credit dd {
-  margin: 0;
-  color: var(--vm-text);
-  font-family: var(--cp-display);
-  font-variant-numeric: tabular-nums;
-}
-
-.vm .cp-primary {
-  background: var(--vm-yellow);
-  color: #0c0d12;
-}
-
-.vm .cp-ghost {
-  border-color: var(--vm-line);
-  color: var(--vm-text);
-}
-
-.vm .cp-ghost:hover:not(:disabled) {
-  border-color: var(--vm-yellow);
-}
-
-.vm-log {
-  display: grid;
-  gap: 8px;
-  font-family: var(--cp-mono);
-  font-size: 12px;
-}
-
-.vm-progress {
-  height: 4px;
-  background: var(--vm-line);
-}
-
-.vm-progress-fill {
-  height: 100%;
-  background: var(--vm-yellow);
-  transition: width 200ms linear;
-}
-
-.vm-log ol {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.vm-log li {
-  color: var(--vm-muted);
-}
-
-.vm-log li::before {
-  content: "[  ] ";
-  white-space: pre;
-}
-
-.vm-log li.ok {
-  color: var(--vm-text);
-}
-
-.vm-log li.ok::before {
-  content: "[OK] ";
-  color: var(--vm-cyan);
-}
-
-.vm-log li.run::before {
-  content: "[..] ";
-  color: var(--vm-yellow);
-}
-
-.vm-tray {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--vm-line);
-  background: var(--vm-inner);
-}
-
-.vm-tray-label {
-  color: var(--vm-muted);
-  font-size: 13px;
-}
-
-.vm-tray-empty {
-  color: var(--vm-muted);
-  font-size: 13px;
-}
-
-.vm-tray-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 4px 14px 4px 8px;
-  border: 1px solid var(--vm-yellow);
-  border-radius: 0;
-  background: transparent;
-  color: var(--vm-text);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.vm-tray-item:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(243, 230, 0, 0.45);
-}
-
-.vm-tray-item:disabled {
-  border-color: var(--vm-line);
-  color: var(--vm-muted);
-  cursor: wait;
-}
-
-.vm-tray-item.dropping .vm-can {
-  animation: vm-drop 520ms cubic-bezier(0.3, 0, 0.6, 1.4) both;
-}
-
-.vm-bag {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin-top: 10px;
-  color: var(--vm-muted);
-  font-size: 13px;
-}
-
-.vm-bag p {
-  margin: 0;
-}
-
-.vm-bag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.vm-bag-list li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--vm-line);
-  color: var(--vm-text);
-}
-
-.vm-bag-count {
-  color: var(--vm-yellow);
-  font-family: var(--cp-display);
-}
-
-.vm-can.tiny {
-  width: 8px;
-  height: 14px;
-  margin: 0;
-  border-radius: 1px;
-}
-
-.vm-can.tiny::before,
-.vm-can.tiny::after {
-  display: none;
-}
-
-.vm-bag strong {
-  color: var(--vm-text);
-  font-family: var(--cp-display);
-}
-
-/* 화면의 유일한 큰 효과: 고장 나는 순간 한 번만 흔들린다 */
-.vm.is-broken .vm-shelf {
-  animation: vm-glitch 420ms steps(3) 1;
-}
-
-@keyframes vm-glitch {
-  0%   { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
-  25%  { transform: translate(-4px, 1px); clip-path: inset(8% 0 55% 0); filter: hue-rotate(90deg); }
-  50%  { transform: translate(4px, -2px); clip-path: inset(48% 0 12% 0); filter: hue-rotate(-60deg); }
-  75%  { transform: translate(-2px, 0); clip-path: inset(20% 0 30% 0); }
-  100% { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
-}
-
-@keyframes vm-drop {
-  from { transform: translateY(-36px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes vm-blink {
-  50% { opacity: 0.25; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vm.is-broken .vm-shelf,
-  .vm.is-broken .vm-led,
-  .vm-cursor,
-  .vm-tray-item.dropping .vm-can {
-    animation: none;
-  }
-
-  .cp-sidebar,
-  .cp-sidebar.open,
-  .cp-scrim,
-  .vm-can,
-  .vm-progress-fill,
-  .cp-nav-link::after {
-    transition: none;
-  }
-}
-
-/* --- 자판기: 전자기파 파형과 형광 강조 --- */
-
-.vm-name {
-  text-shadow: 0 0 8px rgba(243, 255, 26, 0.6);
 }
 
 .vm-signal {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: -4px 0 12px;
 }
 
 .vm-wave {
   flex: 1;
   min-width: 0;
-  height: 36px;
+  height: 30px;
   overflow: hidden;
   filter: drop-shadow(0 0 3px var(--vm-signal));
 }
@@ -2120,7 +1833,8 @@ a.budget-button:hover {
   animation-duration: 0.45s;
 }
 
-.vm-wave-noise {
+.vm-wave-noise,
+.vm-wave-flat {
   display: none;
 }
 
@@ -2133,7 +1847,7 @@ a.budget-button:hover {
 }
 
 .vm.is-broken .vm-wave-line {
-  animation: vm-wave 0.9s steps(6) infinite, vm-blink 0.35s steps(2) 3;
+  animation: vm-wave 0.9s steps(6) infinite;
 }
 
 .vm-signal-reading {
@@ -2146,38 +1860,368 @@ a.budget-button:hover {
   text-shadow: 0 0 6px color-mix(in srgb, var(--vm-signal) 70%, transparent);
 }
 
+/* 몸통: 왼쪽 유리창 + 오른쪽 조작부 */
+.vm-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 196px;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .vm-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vm-window {
+  position: relative;
+  padding: 8px;
+  border: 6px solid #15171e;
+  outline: 1px solid var(--vm-line);
+  background: linear-gradient(180deg, #020306, #07090f);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* 유리 반사광 */
+.vm-glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0 16%, transparent 16% 38%, rgba(255, 255, 255, 0.04) 38% 44%, transparent 44%),
+    linear-gradient(180deg, rgba(0, 240, 255, 0.05), transparent 30%);
+}
+
+.vm-shelf {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 400px) {
+  .vm-shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.vm-shelf > li {
+  min-width: 0;
+}
+
+.vm-item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vm-text);
+  text-align: center;
+  cursor: pointer;
+}
+
+.vm-item:hover:not(:disabled) {
+  background: radial-gradient(ellipse at 50% 45%, rgba(0, 240, 255, 0.16), transparent 70%);
+}
+
+.vm-item:hover:not(:disabled) .vm-can {
+  transform: translateY(-3px);
+}
+
+.vm-item:focus-visible {
+  outline: 2px solid var(--vm-cyan);
+  outline-offset: -2px;
+}
+
+/* 전역 button:disabled는 버튼 전체를 흐리게 하므로, 자판기 칸은 내용만 흐린다 */
+.vm-item:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.vm-item:disabled:not(.picked) > * {
+  opacity: 0.5;
+}
+
+.vm-item.picked {
+  box-shadow: inset 0 0 0 2px var(--vm-red), inset 0 0 22px rgba(255, 59, 92, 0.3);
+}
+
+.vm-can {
+  display: block;
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 58px;
+  border-radius: 4px 4px 3px 3px;
+  transition: transform 140ms ease-out;
+}
+
+/* 캔 위 뚜껑과 가운데 띠 */
+.vm-can::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  border-radius: 2px 2px 0 0;
+  background: #a9afbd;
+}
+
+.vm-can::after {
+  content: "";
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  height: 9px;
+  background: rgba(10, 11, 16, 0.55);
+}
+
+.vm-can.tiny {
+  width: 8px;
+  height: 14px;
+  border-radius: 1px;
+}
+
+.vm-can.tiny::before,
+.vm-can.tiny::after {
+  display: none;
+}
+
+/* 나선 코일: 캔 아래를 감는다 */
+.vm-coil {
+  width: 58px;
+  height: 14px;
+  margin-top: -9px;
+}
+
+.vm-coil path {
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.vm-coil .back {
+  stroke: #4a5062;
+}
+
+.vm-coil .front {
+  stroke: #b8bfcf;
+  filter: drop-shadow(0 0 2px rgba(0, 240, 255, 0.5));
+}
+
+.vm-item-name {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* 선반 앞 가격표 */
+.vm-tag {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 3px 4px 4px;
+  border-top: 1px solid #3b4152;
+  background: var(--vm-steel);
+  font-family: var(--cp-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-code {
+  color: var(--vm-yellow);
+}
+
+.vm-price {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.vm-price s {
+  color: var(--vm-muted);
+  font-size: 10px;
+}
+
 .vm-price-now {
   text-shadow: 0 0 6px rgba(0, 240, 255, 0.35);
 }
 
 .vm.is-broken .vm-price-now {
+  color: var(--vm-yellow);
   text-shadow: 0 0 8px rgba(243, 255, 26, 0.75);
 }
 
-.vm-item.picked {
-  box-shadow: inset 0 0 0 2px var(--vm-yellow), inset 0 0 22px rgba(243, 255, 26, 0.3);
+/* 고장 나는 순간 한 번 흔들린다 */
+.vm.is-broken .vm-shelf {
+  animation: vm-glitch 420ms steps(3) 1;
 }
 
-.vm.is-locked .vm-item.picked {
-  box-shadow: inset 0 0 0 2px var(--vm-red), inset 0 0 22px rgba(255, 59, 92, 0.3);
+/* 조작부: 화면, 키패드, 투입구 */
+.vm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--vm-line);
+  background: linear-gradient(180deg, #161922, #0d0f15);
+}
+
+.vm-display {
+  min-height: 64px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 2px solid #050608;
+  outline: 1px solid var(--vm-line);
+  background: #000;
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vm-signal) 22%, transparent);
+  color: var(--vm-signal);
+  font-family: var(--cp-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--vm-signal) 70%, transparent);
+}
+
+.vm-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: vm-blink 1s steps(2) infinite;
+}
+
+.vm-credit {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-credit dd {
+  margin: 0;
+  color: var(--vm-yellow);
+  font-family: var(--cp-display);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.vm-key {
+  height: 30px;
+  padding: 0;
+  border: 1px solid #3b4152;
+  border-radius: 3px;
+  background: var(--vm-steel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #000;
+  color: var(--vm-text);
+  font-family: var(--cp-display);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vm-key:hover:not(:disabled) {
+  border-color: var(--vm-cyan);
+  color: var(--vm-cyan);
+  text-shadow: 0 0 6px var(--vm-cyan);
+}
+
+.vm-key:active:not(:disabled) {
+  translate: 0 1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.vm-key:disabled {
+  opacity: 0.6;
+}
+
+.vm-key.wide {
+  grid-column: span 3;
+  color: var(--vm-red);
+}
+
+/* 동전 투입구, 지폐 투입구, 카드 리더 (장식) */
+.vm-slots {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr 1fr;
+  gap: 6px;
+}
+
+.vm-slots > span {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border: 1px solid #2c3140;
+  background: #0a0c11;
+}
+
+.vm-slots b {
+  color: var(--vm-muted);
+  font-family: var(--cp-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+.vm-slots i {
+  display: block;
+  background: #000;
+  box-shadow: inset 0 0 0 1px #3b4152;
+}
+
+.vm-coin i {
+  width: 4px;
+  height: 18px;
+}
+
+.vm-bill i {
+  width: 44px;
+  height: 4px;
+  box-shadow: inset 0 0 0 1px #3b4152, 0 6px 0 -1px rgba(0, 255, 120, 0.7), 0 6px 6px -2px rgba(0, 255, 120, 0.7);
+}
+
+.vm-card i {
+  width: 18px;
+  height: 4px;
+  box-shadow: inset 0 0 0 1px #3b4152, 0 6px 0 -1px var(--vm-cyan);
 }
 
 .vm .cp-primary {
   background: var(--vm-yellow);
+  color: #0c0d12;
   box-shadow: 0 0 16px rgba(243, 255, 26, 0.45);
 }
 
-.vm-progress-fill {
-  background: var(--vm-yellow);
-  box-shadow: 0 0 8px var(--vm-yellow);
+.vm .cp-ghost {
+  border-color: var(--vm-line);
+  color: var(--vm-text);
 }
 
-.vm-tray-item {
+.vm .cp-ghost:hover:not(:disabled) {
   border-color: var(--vm-yellow);
-  box-shadow: inset 0 0 12px rgba(243, 255, 26, 0.2);
 }
-
-/* --- 자판기: 배출 방식과 꺼내는 곳의 캔 더미 --- */
 
 .vm-modes {
   display: grid;
@@ -2187,23 +2231,77 @@ a.budget-button:hover {
 .vm-hint {
   margin: 0;
   color: var(--vm-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
+.vm-log {
+  display: grid;
+  gap: 6px;
+  font-family: var(--cp-mono);
+  font-size: 11px;
+}
+
+.vm-progress {
+  height: 4px;
+  background: var(--vm-line);
+}
+
+.vm-progress-fill {
+  height: 100%;
+  background: var(--vm-yellow);
+  box-shadow: 0 0 8px var(--vm-yellow);
+  transition: width 200ms linear;
+}
+
+.vm-log ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vm-log li {
+  color: var(--vm-muted);
+}
+
+.vm-log li::before {
+  content: "[  ] ";
+  white-space: pre;
+}
+
+.vm-log li.ok {
+  color: var(--vm-text);
+}
+
+.vm-log li.ok::before {
+  content: "[OK] ";
+  color: var(--vm-cyan);
+}
+
+.vm-log li.run::before {
+  content: "[..] ";
+  color: var(--vm-yellow);
+}
+
+/* 꺼내는 곳: 어두운 통 + 위쪽 반투명 덮개 */
 .vm-tray {
-  min-height: 76px;
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--vm-line);
+  background: linear-gradient(180deg, #0b0d12, #000);
+  box-shadow: inset 0 10px 24px rgba(0, 0, 0, 0.9);
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
 }
 
 .vm-tray.filled {
-  border-color: color-mix(in srgb, var(--vm-yellow) 70%, transparent);
-  box-shadow: inset 0 -10px 24px rgba(243, 255, 26, 0.08);
+  border-color: color-mix(in srgb, var(--vm-yellow) 60%, transparent);
 }
 
-.vm-tray {
-  display: grid;
-  gap: 8px;
-  align-items: stretch;
+.vm-tray.warning {
+  border-color: var(--vm-red);
+  box-shadow: inset 0 -12px 28px rgba(255, 59, 92, 0.2);
 }
 
 .vm-tray-head {
@@ -2212,16 +2310,19 @@ a.budget-button:hover {
   align-items: center;
 }
 
+.vm-tray-label {
+  color: var(--vm-muted);
+  font-family: var(--cp-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+}
+
 .vm-load {
   color: var(--vm-muted);
   font-family: var(--cp-mono);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.vm-tray.warning {
-  border-color: var(--vm-red);
-  box-shadow: inset 0 -12px 28px rgba(255, 59, 92, 0.18);
 }
 
 .vm-tray.warning .vm-load {
@@ -2237,11 +2338,26 @@ a.budget-button:hover {
   background: linear-gradient(to bottom, transparent 40%, rgba(0, 240, 255, 0.05));
 }
 
+.vm-flap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 34%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(34, 38, 52, 0.92), rgba(34, 38, 52, 0.45));
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
 .vm-tray-empty {
   position: absolute;
-  inset: 0;
+  inset: 34% 0 0;
   display: grid;
   place-items: center;
+  color: var(--vm-muted);
+  font-size: 13px;
 }
 
 /* 진열칸과 같은 크기(34×58)의 캔 */
@@ -2278,27 +2394,93 @@ a.budget-button:hover {
 
 .vm-tray-item {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px 14px;
+  border: 1px solid var(--vm-yellow);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 0 12px rgba(243, 255, 26, 0.2);
+  color: var(--vm-text);
+  font-weight: 600;
+  cursor: pointer;
 }
 
-/* --- 자판기: 적재 경고, 폭발, 잔해 --- */
-
-.vm-wave-flat {
-  display: none;
+.vm-tray-item:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(243, 255, 26, 0.45);
 }
 
-.vm.is-exploded .vm-wave-sine,
-.vm.is-exploded .vm-wave-noise {
-  display: none;
+.vm-tray-item:disabled {
+  border-color: var(--vm-line);
+  color: var(--vm-muted);
+  cursor: wait;
 }
 
-.vm.is-exploded .vm-wave-flat {
-  display: inline;
+/* 아래 통풍구와 받침 */
+.vm-base {
+  position: relative;
+  height: 34px;
+  margin: 0 -12px;
+  border-top: 1px solid var(--vm-line);
+  background: #0a0b10;
 }
 
-.vm.is-exploded .vm-wave-line {
-  animation: none;
-  opacity: 0.6;
+.vm-grille {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 9px;
+  height: 14px;
+  background: repeating-linear-gradient(90deg, #000 0 5px, #232733 5px 8px);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--vm-signal) 25%, transparent);
 }
+
+/* 캐비닛 밖 기록 */
+.vm-bag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  max-width: 640px;
+  margin: 12px auto 0;
+  color: var(--vm-muted);
+  font-size: 13px;
+}
+
+.vm-bag p {
+  margin: 0;
+}
+
+.vm-bag strong {
+  color: var(--vm-text);
+  font-family: var(--cp-display);
+}
+
+.vm-bag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vm-bag-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--vm-line);
+  color: var(--vm-text);
+}
+
+.vm-bag-count {
+  color: var(--vm-yellow);
+  font-family: var(--cp-display);
+}
+
+/* --- 적재 경고와 파손 --- */
 
 .vm-frame.is-warning::before {
   animation-duration: 0.6s;
@@ -2310,11 +2492,11 @@ a.budget-button:hover {
 
 .vm-frame.is-exploded {
   --vm-signal: #7a2232;
-  animation: vm-shake 700ms cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+  animation: vm-shake 900ms cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
 }
 
 .vm-frame.is-exploded::before {
-  animation: vm-burst 1.4s ease-out 1 forwards;
+  animation: vm-burst 1.6s ease-out 1 forwards;
 }
 
 /* 터진 뒤에는 깎은 모서리 틀이 무너져 캔이 기계 밖으로 날아갈 수 있다 */
@@ -2339,14 +2521,32 @@ a.budget-button:hover {
   animation: vm-flicker 2.4s steps(1) infinite;
 }
 
+.vm.is-exploded .vm-wave-sine,
+.vm.is-exploded .vm-wave-noise {
+  display: none;
+}
+
+.vm.is-exploded .vm-wave-flat {
+  display: inline;
+}
+
+.vm.is-exploded .vm-wave-line {
+  animation: none;
+  opacity: 0.6;
+}
+
 .vm.is-exploded .vm-shelf {
-  transform: rotate(-1.2deg) translateY(4px);
-  filter: grayscale(0.7) brightness(0.55);
+  transform: rotate(-1.4deg) translateY(5px);
+  filter: grayscale(0.7) brightness(0.5);
   transition: transform 300ms ease-out, filter 600ms ease-out 200ms;
 }
 
+.vm.is-exploded .vm-glass {
+  background: rgba(20, 22, 30, 0.5);
+}
+
 .vm.is-exploded .vm-panel {
-  filter: grayscale(0.5) brightness(0.8);
+  filter: grayscale(0.5) brightness(0.75);
 }
 
 .vm.is-exploded .vm-display {
@@ -2354,19 +2554,16 @@ a.budget-button:hover {
   animation: vm-flicker 1.6s steps(1) infinite;
 }
 
-.vm-cracks-wrap {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.vm-shelf {
-  position: relative;
+.vm.is-exploded .vm-key {
+  transform-origin: 50% 0;
 }
 
 .vm-cracks {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
 .vm-cracks path {
@@ -2379,45 +2576,71 @@ a.budget-button:hover {
   animation: vm-crack 500ms ease-out 150ms forwards;
 }
 
-/* 폭발 효과: 폭심은 꺼내는 곳 */
+/* --- 폭발: 폭심은 자판기 한가운데 --- */
+
 .vm-blast {
   position: absolute;
   left: 50%;
-  bottom: 90px;
+  top: 60%;
   z-index: 5;
   width: 0;
   height: 0;
   pointer-events: none;
 }
 
+.vm-blast-fire {
+  position: absolute;
+  left: -220px;
+  top: -220px;
+  width: 440px;
+  height: 440px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 8%, #fff6a0 16%, #ffb020 30%, #ff3b1f 46%, rgba(120, 10, 40, 0.6) 60%, transparent 72%);
+  mix-blend-mode: screen;
+  animation: vm-fire 1100ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+.vm-blast-fire.second {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 6%, rgba(255, 43, 214, 0.8) 26%, rgba(0, 240, 255, 0.4) 46%, transparent 70%);
+  animation-delay: 140ms;
+  animation-duration: 1300ms;
+}
+
 .vm-blast-flash {
   position: absolute;
-  left: -160px;
-  top: -160px;
-  width: 320px;
-  height: 320px;
+  left: -500px;
+  top: -500px;
+  width: 1000px;
+  height: 1000px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 12%, #f3ff1a 24%, rgba(255, 43, 214, 0.6) 45%, transparent 70%);
-  animation: vm-flash 650ms ease-out forwards;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 10%, rgba(243, 255, 26, 0.5) 25%, rgba(255, 43, 214, 0.25) 42%, transparent 65%);
+  animation: vm-flash 800ms ease-out forwards;
 }
 
 .vm-blast-ring {
   position: absolute;
-  left: -40px;
-  top: -40px;
-  width: 80px;
-  height: 80px;
-  border: 3px solid var(--vm-cyan);
+  left: -50px;
+  top: -50px;
+  width: 100px;
+  height: 100px;
+  border: 4px solid var(--vm-cyan);
   border-radius: 50%;
-  box-shadow: 0 0 18px var(--vm-cyan), inset 0 0 18px var(--vm-cyan);
+  box-shadow: 0 0 22px var(--vm-cyan), inset 0 0 22px var(--vm-cyan);
   opacity: 0;
-  animation: vm-ring 700ms ease-out forwards;
+  animation: vm-ring 900ms ease-out forwards;
 }
 
 .vm-blast-ring.late {
   border-color: var(--vm-magenta);
-  box-shadow: 0 0 18px var(--vm-magenta), inset 0 0 18px var(--vm-magenta);
+  box-shadow: 0 0 22px var(--vm-magenta), inset 0 0 22px var(--vm-magenta);
   animation-delay: 120ms;
+}
+
+.vm-blast-ring.last {
+  border-color: var(--vm-yellow);
+  box-shadow: 0 0 22px var(--vm-yellow), inset 0 0 22px var(--vm-yellow);
+  animation-delay: 260ms;
+  animation-duration: 1200ms;
 }
 
 .vm-shard {
@@ -2425,99 +2648,332 @@ a.budget-button:hover {
   left: 0;
   top: 0;
   opacity: 0;
-  box-shadow: 0 0 8px currentColor;
-  animation: vm-shard 1100ms cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+  box-shadow: 0 0 10px currentColor;
+  animation: vm-shard 1400ms cubic-bezier(0.12, 0.75, 0.3, 1) forwards;
 }
+
+/* 유리창 조각: 반짝이며 아래로 쏟아진다 */
+.vm-glass-shard {
+  position: absolute;
+  opacity: 0;
+  background: linear-gradient(135deg, rgba(220, 245, 255, 0.65), rgba(0, 240, 255, 0.12));
+  animation: vm-glass 1500ms cubic-bezier(0.3, 0, 0.7, 1) forwards;
+}
+
+/* 부서진 뒤에도 피어오르는 연기와 끊어진 전선의 불꽃 */
+.vm-smoke {
+  position: absolute;
+  left: -50px;
+  top: -40px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(70, 70, 80, 0.55), transparent 70%);
+  filter: blur(6px);
+  opacity: 0;
+  animation: vm-smoke 4.2s ease-out infinite;
+}
+
+.vm-smoke.s1 { left: -110px; animation-delay: 0.7s; }
+.vm-smoke.s2 { left: 10px; animation-delay: 1.4s; }
+.vm-smoke.s3 { left: -70px; top: -120px; animation-delay: 2.1s; }
+.vm-smoke.s4 { left: 40px; top: -150px; animation-delay: 2.8s; }
+.vm-smoke.s5 { left: -140px; top: -200px; animation-delay: 3.5s; }
+
+.vm-zap {
+  position: absolute;
+  left: 60px;
+  top: -260px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff6a0;
+  box-shadow: 0 0 8px #f3ff1a, 0 0 18px #ffb020;
+  opacity: 0;
+  animation: vm-zap 1.9s steps(1) infinite;
+}
+
+.vm-zap.z1 { left: -150px; top: -60px; animation-delay: 0.6s; }
+.vm-zap.z2 { left: 120px; top: 40px; animation-delay: 1.2s; }
+
+/* --- 쓰레기통 (오른쪽 아래) --- */
+
+.cp-trash-wrap {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+}
+
+.cp-trash {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 70px;
+  padding: 0 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--cp-text);
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+
+.cp-trash-lid {
+  display: block;
+  width: 62px;
+  height: 10px;
+  border: 1px solid var(--cp-accent);
+  background: linear-gradient(180deg, #3a3f4f, #1a1d26);
+  box-shadow: 0 0 10px rgba(243, 230, 0, 0.35);
+  transform-origin: 6px 100%;
+}
+
+.cp-trash-body {
+  display: block;
+  width: 54px;
+  height: 64px;
+  margin-top: 1px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(0, 0, 0, 0.35) 9px 11px),
+    linear-gradient(180deg, #2a2e3b, #12141b);
+  clip-path: polygon(0 0, 100% 0, 88% 100%, 12% 100%);
+  box-shadow: inset 0 -16px 0 -8px rgba(243, 230, 0, 0.6);
+}
+
+.cp-trash-label {
+  margin-top: 4px;
+  padding: 1px 6px;
+  background: rgba(7, 8, 12, 0.8);
+  color: var(--cp-accent);
+  font-family: var(--cp-display);
+  font-size: 12px;
+}
+
+.cp-trash:hover .cp-trash-lid,
+.cp-trash:focus-visible .cp-trash-lid {
+  rotate: -18deg;
+}
+
+.cp-trash:hover .cp-trash-body {
+  filter: drop-shadow(0 0 8px rgba(243, 230, 0, 0.5));
+}
+
+.cp-trash.bump-a {
+  animation: cp-trash-bump-a 360ms ease-out;
+}
+
+.cp-trash.bump-b {
+  animation: cp-trash-bump-b 360ms ease-out;
+}
+
+.cp-trash.bump-a .cp-trash-lid {
+  animation: cp-lid-a 420ms ease-out;
+}
+
+.cp-trash.bump-b .cp-trash-lid {
+  animation: cp-lid-b 420ms ease-out;
+}
+
+.cp-trash-pop {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  color: var(--cp-accent);
+  font-family: var(--cp-display);
+  font-size: 18px;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(243, 230, 0, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: cp-pop 1.1s ease-out forwards;
+}
+
+@media (max-width: 600px) {
+  .cp-trash-wrap {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .cp-trash {
+    scale: 0.8;
+  }
+}
+
+/* --- 2차 피해: 화면 전체가 부서진다 --- */
 
 .cp-flash {
   position: fixed;
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  background: radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.9), rgba(243, 255, 26, 0.5) 40%, transparent 75%);
-  animation: cp-flash 600ms ease-out forwards;
+  background: radial-gradient(circle at 70% 60%, #fff, rgba(255, 246, 160, 0.9) 30%, rgba(255, 59, 31, 0.6) 60%, rgba(80, 0, 20, 0.5));
+  animation: cp-flash 1000ms ease-out forwards;
 }
 
-@keyframes vm-shake {
-  0%, 100% { transform: translate(0, 0) rotate(0); }
-  10% { transform: translate(-10px, 4px) rotate(-1.5deg); }
-  20% { transform: translate(12px, -6px) rotate(1.2deg); }
-  30% { transform: translate(-9px, 3px) rotate(-1deg); }
-  45% { transform: translate(7px, -2px) rotate(0.6deg); }
-  60% { transform: translate(-4px, 1px) rotate(-0.3deg); }
-  80% { transform: translate(2px, 0) rotate(0.1deg); }
+.cp.is-breaking .cp-main,
+.cp.is-breaking .cp-header,
+.cp.is-breaking .cp-footer {
+  animation: cp-quake 1100ms cubic-bezier(0.36, 0.07, 0.19, 0.97) 1, cp-split 1100ms steps(8) 1;
 }
 
-@keyframes vm-jitter {
-  50% { transform: translate(1px, -1px); }
+.cp.is-wrecked .cp-main,
+.cp.is-wrecked .cp-header,
+.cp.is-wrecked .cp-footer,
+.cp.is-wrecked .cp-trash-wrap {
+  filter: saturate(0.5) brightness(0.7);
 }
 
-@keyframes vm-burst {
-  0%   { opacity: 0.4; transform: scale(1); }
-  12%  { opacity: 1; transform: scale(1.25); filter: blur(28px); }
-  100% { opacity: 0.12; transform: scale(1); }
+.cp-wreck {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  cursor: crosshair;
 }
 
-@keyframes vm-flash {
-  0%   { opacity: 0; transform: scale(0.2); }
-  15%  { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.6); }
+.cp-wreck.breaking {
+  cursor: default;
 }
 
-@keyframes vm-ring {
-  0%   { opacity: 1; transform: scale(0.3); }
-  100% { opacity: 0; transform: scale(7); }
+.cp-wreck:focus-visible {
+  outline: none;
 }
 
-@keyframes vm-shard {
-  0%   { opacity: 1; transform: translate(0, 0) rotate(0); }
-  80%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
+.cp-wreck-shade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.6) 100%);
+  transition: opacity 400ms ease-out;
 }
 
-@keyframes vm-crack {
-  to { stroke-dashoffset: 0; }
+.cp-cracks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-@keyframes vm-flicker {
-  0%, 100% { opacity: 1; }
-  40% { opacity: 0.35; }
-  44% { opacity: 1; }
-  70% { opacity: 0.6; }
+.cp-crack path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cp-crack-draw 420ms ease-out forwards;
 }
 
-@keyframes cp-flash {
-  0%   { opacity: 0; }
-  10%  { opacity: 1; }
-  100% { opacity: 0; }
+.cp-crack .core {
+  stroke: rgba(240, 248, 255, 0.9);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .vm-frame.is-warning .vm-edge,
-  .vm-frame.is-exploded,
-  .vm-frame.is-exploded::before,
-  .vm.is-exploded .vm-name,
-  .vm.is-exploded .vm-display,
-  .vm-tray.warning .vm-load {
-    animation: none;
-  }
-
-  .vm-blast,
-  .cp-flash {
-    display: none;
-  }
-
-  .vm-cracks path {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
-
-  /* 날아가는 움직임 대신 터진 캔을 바로 감춘다 */
-  .vm.is-exploded .vm-tray-can,
-  .vm.is-exploded .vm-shelf .vm-can {
-    visibility: hidden;
-  }
+.cp-crack .glow {
+  stroke: rgba(0, 240, 255, 0.22);
 }
+
+.cp-crack.ring .core {
+  stroke: rgba(240, 248, 255, 0.6);
+}
+
+.cp-crack,
+.cp-cell,
+.cp-hole {
+  transition: opacity 450ms ease-out;
+}
+
+.cp-crack.healed,
+.cp-cell.healed,
+.cp-hole.healed {
+  opacity: 0;
+}
+
+.cp-cell {
+  fill: #fff;
+}
+
+.cp-hole {
+  fill: rgba(0, 0, 0, 0.85);
+  stroke: rgba(240, 248, 255, 0.8);
+}
+
+.cp-wreck-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 6px 12px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--cp-danger);
+  background: rgba(7, 8, 12, 0.9);
+  box-shadow: 0 0 18px rgba(255, 59, 92, 0.4);
+  color: var(--cp-text);
+  font-size: 14px;
+  translate: -50% 0;
+  animation: vm-flicker 3s steps(1) infinite;
+}
+
+.cp-wreck-hint b {
+  color: var(--cp-danger);
+  font-family: var(--cp-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-repair-bar {
+  grid-column: span 2;
+  height: 4px;
+  background: rgba(255, 59, 92, 0.25);
+}
+
+.cp-repair-bar span {
+  display: block;
+  height: 100%;
+  background: var(--cp-info);
+  box-shadow: 0 0 8px var(--cp-info);
+  transition: width 300ms ease-out;
+}
+
+/* 수리할 때 튀는 용접 불꽃 */
+.cp-weld {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.cp-weld::before,
+.cp-weld::after {
+  content: "";
+  position: absolute;
+  left: -30px;
+  top: -30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+}
+
+.cp-weld::before {
+  background: radial-gradient(circle, #fff 0 10%, #b8f7ff 25%, rgba(0, 240, 255, 0.5) 45%, transparent 70%);
+  animation: cp-weld 500ms ease-out forwards;
+}
+
+.cp-weld::after {
+  border: 2px solid var(--cp-info);
+  animation: vm-ring 600ms ease-out forwards;
+}
+
+.cp-repair-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.35), transparent 70%);
+  animation: cp-flash 900ms ease-out forwards;
+}
+
+/* --- 키프레임 --- */
 
 @keyframes vm-wave {
   to { transform: translateX(-400px); }
@@ -2533,15 +2989,209 @@ a.budget-button:hover {
   50%      { opacity: 0.55; }
 }
 
+@keyframes vm-blink {
+  50% { opacity: 0.25; }
+}
+
+@keyframes vm-glitch {
+  0%   { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
+  25%  { transform: translate(-4px, 1px); clip-path: inset(8% 0 55% 0); filter: hue-rotate(90deg); }
+  50%  { transform: translate(4px, -2px); clip-path: inset(48% 0 12% 0); filter: hue-rotate(-60deg); }
+  75%  { transform: translate(-2px, 0); clip-path: inset(20% 0 30% 0); }
+  100% { transform: translate(0); clip-path: inset(0 0 0 0); filter: none; }
+}
+
+/* 인라인 transform(부서진 변위)과 겹치지 않도록 흔들림은 translate 속성으로 준다 */
+@keyframes vm-shake {
+  0%, 100% { translate: 0 0; }
+  8%  { translate: -18px 8px; }
+  16% { translate: 22px -10px; }
+  26% { translate: -16px 6px; }
+  38% { translate: 12px -4px; }
+  52% { translate: -7px 2px; }
+  70% { translate: 3px 0; }
+}
+
+@keyframes cp-quake {
+  0%, 100% { translate: 0 0; }
+  10% { translate: -14px 6px; }
+  20% { translate: 16px -8px; }
+  30% { translate: -12px 10px; }
+  42% { translate: 9px -5px; }
+  56% { translate: -6px 3px; }
+  72% { translate: 3px -1px; }
+}
+
+/* 충격에 색이 갈라진다 */
+@keyframes cp-split {
+  0%, 100% { filter: none; }
+  12% { filter: drop-shadow(6px 0 0 rgba(255, 0, 60, 0.75)) drop-shadow(-6px 0 0 rgba(0, 240, 255, 0.75)); }
+  30% { filter: drop-shadow(-4px 2px 0 rgba(255, 0, 60, 0.6)) drop-shadow(4px -2px 0 rgba(0, 240, 255, 0.6)) brightness(1.4); }
+  55% { filter: drop-shadow(3px 0 0 rgba(255, 0, 60, 0.5)) drop-shadow(-3px 0 0 rgba(0, 240, 255, 0.5)); }
+}
+
+@keyframes vm-jitter {
+  50% { transform: translate(1px, -1px); }
+}
+
+@keyframes vm-burst {
+  0%   { opacity: 0.4; transform: scale(1); }
+  10%  { opacity: 1; transform: scale(1.5); filter: blur(34px); }
+  100% { opacity: 0.1; transform: scale(1); }
+}
+
+@keyframes vm-fire {
+  0%   { opacity: 0; transform: scale(0.1); }
+  12%  { opacity: 1; transform: scale(0.9); }
+  60%  { opacity: 0.75; transform: scale(1.9); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+@keyframes vm-flash {
+  0%   { opacity: 0; transform: scale(0.2); }
+  12%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+@keyframes vm-ring {
+  0%   { opacity: 1; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(14); }
+}
+
+@keyframes vm-shard {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
+}
+
+@keyframes vm-glass {
+  0%   { opacity: 0.9; transform: translate(0, 0) rotate(0); }
+  80%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
+}
+
+@keyframes vm-smoke {
+  0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+  20%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-220px) scale(2.4); }
+}
+
+@keyframes vm-zap {
+  0%, 100% { opacity: 0; }
+  4%  { opacity: 1; transform: scale(1.6); }
+  8%  { opacity: 0; }
+  12% { opacity: 1; transform: scale(0.8); }
+  15% { opacity: 0; }
+}
+
+@keyframes vm-crack {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes vm-flicker {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.35; }
+  44% { opacity: 1; }
+  70% { opacity: 0.6; }
+}
+
+@keyframes cp-flash {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes cp-crack-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes cp-weld {
+  0%   { opacity: 1; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+@keyframes cp-pop {
+  0%   { opacity: 0; transform: translate(-50%, 0) scale(0.7); }
+  15%  { opacity: 1; transform: translate(-50%, -14px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -64px) scale(1); }
+}
+
+@keyframes cp-trash-bump-a {
+  30% { translate: 0 -6px; rotate: -4deg; }
+  60% { translate: 0 0; rotate: 3deg; }
+}
+
+@keyframes cp-trash-bump-b {
+  30% { translate: 0 -6px; rotate: -4deg; }
+  60% { translate: 0 0; rotate: 3deg; }
+}
+
+@keyframes cp-lid-a {
+  30% { rotate: -55deg; }
+}
+
+@keyframes cp-lid-b {
+  30% { rotate: -55deg; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .cp-field-wave,
+  .cp.is-alert .cp-field svg,
+  .cp.is-wrecked .cp-field,
+  .cp-field-pulse,
   .vm-frame::before,
   .vm::after,
   .vm-wave-line,
-  .vm.is-broken .vm-wave-line {
+  .vm.is-broken .vm-wave-line,
+  .vm.is-broken .vm-shelf,
+  .vm.is-broken .vm-led,
+  .vm-cursor,
+  .vm-frame.is-warning .vm-edge,
+  .vm-frame.is-exploded,
+  .vm-frame.is-exploded::before,
+  .vm.is-exploded .vm-name,
+  .vm.is-exploded .vm-display,
+  .vm-tray.warning .vm-load,
+  .cp.is-breaking .cp-main,
+  .cp.is-breaking .cp-header,
+  .cp.is-breaking .cp-footer,
+  .cp-wreck-hint,
+  .cp-trash,
+  .cp-trash-lid {
     animation: none;
   }
 
-  .vm::after {
+  .vm::after,
+  .vm-blast,
+  .cp-flash,
+  .cp-repair-flash,
+  .cp-weld {
     display: none;
+  }
+
+  .dmg,
+  .cp.is-breaking .dmg,
+  .cp-sidebar,
+  .cp-sidebar.open,
+  .cp-scrim,
+  .vm-can,
+  .vm-progress-fill,
+  .cp-nav-link::after,
+  .cp-crack,
+  .cp-cell,
+  .cp-hole {
+    transition: none;
+  }
+
+  .vm-cracks path,
+  .cp-crack path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  /* 날아가는 움직임 대신 터진 캔을 바로 감춘다 */
+  .vm.is-exploded .vm-tray-can,
+  .vm.is-exploded .vm-shelf .vm-can {
+    visibility: hidden;
   }
 }

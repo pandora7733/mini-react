@@ -1054,9 +1054,10 @@ test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 �
   page.frame.remove();
 });
 
-test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지고, 새 자판기를 설치할 수 있다", async () => {
+test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지고 화면 전체가 부서지며, 여러 번 눌러 고친다", async () => {
   const { page, doc, idle } = await brokenMachine();
   const ids = ["chrome-cola", "neon-cider", "synapse", "midnight", "lemonade", "blackout"];
+  assert.ok($(doc, ".cp").classList.contains("is-alert"), "해킹하면 배경 전자기장이 빨갛게 바뀐다.");
 
   for (let i = 0; i < 24; i++) $(doc, `[data-drink="${ids[i % ids.length]}"]`).click();
   await idle();
@@ -1070,17 +1071,80 @@ test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지�
   $(doc, '[data-drink="synapse"]').click();
   await until(() => $(doc, ".vm").classList.contains("is-exploded"), "31개째에 터져야 합니다.");
   assert.ok(doc.querySelector(".vm-blast") !== null);
-  assert.ok(doc.querySelector(".vm-cracks") !== null);
   assert.equal(doc.querySelector("#vm-take"), null, "터지면 꺼낼 수 없습니다.");
   assert.equal(($(doc, '[data-drink="synapse"]') as HTMLButtonElement).disabled, true);
   assert.equal($(doc, "#vm-lost").textContent, "31");
 
-  $(doc, "#vm-install").click();
+  // 2차 피해: 화면 전체가 부서진다
+  await until(() => doc.querySelector("#cp-wreck:not(.breaking)") !== null, "화면이 부서지지 않았습니다.");
+  assert.ok($(doc, ".cp").classList.contains("is-wrecked"));
+  assert.equal(doc.activeElement?.id, "cp-wreck", "부서진 화면에 초점이 가야 합니다.");
+  assert.ok($(doc, ".cp-hero h1").style.transform !== "", "제목도 밀려난다.");
+  assert.equal($(doc, "#cp-repair-count").textContent, "0/8");
+
+  for (let i = 1; i < 8; i++) {
+    $(doc, "#cp-wreck").click();
+    await wait();
+    assert.equal($(doc, "#cp-repair-count").textContent, `${i}/8`);
+  }
+  $(doc, "#cp-wreck").click();
   await wait();
+  assert.equal(doc.querySelector("#cp-wreck"), null, "다 고치면 금이 사라진다.");
   assert.ok($(doc, ".vm").classList.contains("is-locked"));
+  assert.ok($(doc, ".cp").classList.contains("is-normal"), "배경도 노랑으로 돌아온다.");
+  assert.equal($(doc, "#vm-display-text").textContent, "시스템 복구 완료. 정상 영업을 시작합니다");
   assert.equal(doc.querySelectorAll(".vm-tray-can").length, 0);
   assert.equal($(doc, "#vm-load").textContent, "적재 0/30");
   assert.equal($(doc, "#vm-lost").textContent, "31", "날아간 캔 기록은 남는다.");
+  page.frame.remove();
+});
+
+test("자판기: 쓰레기통을 뒤져 100 단위 크레딧을 모으고, 정상 영업 중인 자판기에서 사 먹는다", async () => {
+  const page = await openPage("./index.html");
+  const { doc } = page;
+  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
+  assert.ok($(doc, ".cp").classList.contains("is-normal"));
+
+  const balance = () => Number($(doc, "#vm-balance").textContent!.replace(/,/g, ""));
+  let previous = 0;
+  while (balance() < 1500) {
+    $(doc, "#cp-trash").click();
+    await wait();
+    const gain = balance() - previous;
+    assert.ok(gain >= 100 && gain <= 500 && gain % 100 === 0, `주운 크레딧 ${gain}`);
+    assert.equal($(doc, "#cp-credit").textContent!.includes($(doc, "#vm-balance").textContent!), true, "헤더에도 잔액이 보인다.");
+    previous = balance();
+  }
+  assert.ok(/^쓰레기통에서 [\d,]+ 크레딧을 주웠습니다$/.test($(doc, "#cp-trash-message").textContent!));
+
+  $(doc, '[data-drink="chrome-cola"]').click();
+  await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "산 음료가 나오지 않았습니다.");
+  assert.equal(balance(), previous - 1500);
+  assert.equal($(doc, ".vm-tray-can").dataset.drinkId, "chrome-cola");
+  $(doc, "#vm-take").click();
+  await wait();
+  assert.equal($(doc, ".vm-bag-list").textContent, "크롬 콜라 1");
+  page.frame.remove();
+});
+
+test("자판기: 키패드로 열 문자와 번호를 눌러 고른다", async () => {
+  const { page, doc, idle } = await brokenMachine();
+  const key = (k: string) => $(doc, `.vm-key[data-key="${k}"]`).click();
+
+  key("3");
+  await wait();
+  assert.equal($(doc, "#vm-display-text").textContent, "열 문자(A, B)를 먼저 누르세요");
+  key("B");
+  await wait();   // 누른 열 문자가 그려진 뒤에 번호를 누른다
+  key("7");
+  await wait();
+  assert.equal($(doc, "#vm-display-text").textContent, "B7: 없는 번호입니다");
+
+  key("B");
+  await wait();
+  key("2");
+  await idle();
+  assert.equal($(doc, ".vm-tray-can").dataset.drinkId, "lemonade");
   page.frame.remove();
 });
 
