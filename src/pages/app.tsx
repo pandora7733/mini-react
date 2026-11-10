@@ -1,6 +1,7 @@
 import { h } from "../createElement.js";
 import { useEffect } from "../hooks.js";
 import { Link, Route, Routes, startRouter } from "../router.js";
+import { InterviewNotePage } from "./interview.js";
 import { EditEntryPage, EntryPage, MonthPage, NewEntryPage, StatsPage } from "./budget/pages.js";
 import { Phase1Page } from "./phase1.js";
 import { Phase2Page } from "./phase2.js";
@@ -34,6 +35,10 @@ function Home() {
           <strong>브라우저 테스트</strong>
           <span>DOM이 필요한 단위 테스트와 각 페이지의 기능 테스트를 실행합니다.</span>
         </a>
+        <Link className="link-card" to="/interview">
+          <strong>mini-react 면접 노트</strong>
+          <span>구현 방식과 React의 동작 원리를 면접 질문과 답변 예시와 함께 정리했습니다.</span>
+        </Link>
       </nav>
     </main>
   );
@@ -59,6 +64,7 @@ startRouter(
     <Route path="/" element={<Home />} />
     <Route path="/phase1" element={<Phase1Page />} />
     <Route path="/phase2" element={<Phase2Page />} />
+    <Route path="/interview" element={<InterviewNotePage />} />
     {/* 먼저 선언한 라우트가 이기므로 고정 경로를 파라미터 경로보다 앞에 둔다 */}
     <Route path="/budget/new/:month?" element={<NewEntryPage />} />
     <Route path="/budget/stats" element={<StatsPage />} />

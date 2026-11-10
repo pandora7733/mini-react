@@ -21,6 +21,7 @@ npm run serve
 | `/#/phase2` | Focus Board |
 | `/#/budget`, `/#/budget/2026-11`, `/#/budget/stats` | 예시 앱: 가계부 |
 | `/tests.html` | 브라우저 단위 테스트와 기능 테스트 (앱과 분리된 별도 문서) |
+| `/#/interview` | mini-react 면접 노트: 구현 방식과 React 원리, 예상 질문과 답변 |
 
 ## 구조
 

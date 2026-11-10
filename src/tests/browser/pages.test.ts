@@ -952,3 +952,42 @@ test("Phase 2: 다시 열어도 할 일이 저장되어 있다", async () => {
   assert.equal(titles.at(-1), "저장 확인");
   p.close();
 });
+
+// --- 면접 노트 ---
+
+test("면접 노트: 홈의 카드로 들어가면 목차와 모든 절을 그린다", async () => {
+  const page = await openPage("./index.html");
+  $(page.doc, 'a.link-card[href="#/interview"]').click();
+  await wait(ROUTE_WAIT);
+  assert.equal(page.doc.title, "mini-react 면접 노트");
+  const links = page.doc.querySelectorAll(".g-toc a");
+  const topics = page.doc.querySelectorAll(".g-topic");
+  assert.equal(links.length, topics.length);
+  assert.ok(topics.length >= 30, `절 ${topics.length}개`);
+  page.frame.remove();
+});
+
+test("면접 노트: 목차를 눌러도 라우트는 그대로이고 해당 절로 스크롤한다", async () => {
+  const page = await openPage("./index.html#/interview");
+  const target = $(page.doc, "#limits");
+  // 화면 밖 iframe에서는 부드러운 스크롤이 진행되지 않으므로 동작 줄이기 설정으로 즉시 스크롤하게 한다
+  page.win.matchMedia = (() => ({ matches: true })) as unknown as typeof page.win.matchMedia;
+  Array.from(page.doc.querySelectorAll<HTMLAnchorElement>(".g-toc a")).at(-1)!.click();   // 마지막 항목 = 한계와 개선 방향
+  await wait(ROUTE_WAIT);
+  assert.equal(page.win.location.hash, "#/interview");
+  assert.ok(page.doc.querySelector(".g-hero") !== null, "페이지가 바뀌면 안 됩니다.");
+  // 마지막 절이라 문서 끝에 닿으면 맨 위까지 올라오지 않으므로 화면 안에 들어왔는지만 본다
+  const top = target.getBoundingClientRect().top;
+  assert.ok(top >= 0 && top < page.win.innerHeight, `절 위치 ${top}`);
+  page.frame.remove();
+});
+
+test("면접 노트: 떠나면 이 페이지에서만 쓰는 글꼴을 뗀다", async () => {
+  const page = await openPage("./index.html#/interview");
+  assert.ok(page.doc.getElementById("guide-fonts") !== null);
+  $(page.doc, ".g-back").click();
+  await wait(ROUTE_WAIT);
+  assert.equal(page.doc.getElementById("guide-fonts"), null);
+  assert.ok(page.doc.querySelector(".link-list") !== null);
+  page.frame.remove();
+});
