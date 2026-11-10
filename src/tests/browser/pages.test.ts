@@ -601,23 +601,19 @@ test("라우터: 형식이 틀린 파라미터는 이번 달로 처리한다", a
   localStorage.removeItem(BUDGET_STORAGE_KEY);
 });
 
-test("라우터: 파라미터만 바뀌면 페이지를 유지하고, 뒤로가기로 이전 달에 돌아온다", async () => {
+test("라우터: 파라미터만 바뀌면 같은 DOM을 고치고, 뒤로가기로 이전 달에 돌아온다", async () => {
   const p = await budget();
-  const draft = $<HTMLInputElement>(p.doc, "#entry-title");
+  const summary = $(p.doc, "#sum-income");
   const label = p.text("#month-label");
-  typeInto(draft, "입력 중");
-  await wait();
 
   $(p.doc, "#month-prev").click();
   await wait(ROUTE_WAIT);
   assert.ok(p.text("#month-label") !== label);
-  assert.equal($(p.doc, "#entry-title"), draft, "같은 DOM 노드여야 합니다.");
-  assert.equal(draft.value, "입력 중");
+  assert.equal($(p.doc, "#sum-income"), summary, "같은 DOM 노드여야 합니다.");
 
   p.win.history.back();
   await wait(ROUTE_WAIT);
   assert.equal(p.text("#month-label"), label);
-  assert.equal(draft.value, "입력 중");
   p.close();
 });
 
@@ -702,17 +698,28 @@ async function budget() {
   localStorage.removeItem(BUDGET_STORAGE_KEY);
   const page = await openPage("./index.html?board=e2e#/budget");
   const { doc } = page;
-  const text = (selector: string) => $(doc, selector).textContent;
+  const dialog = { asked: 0, answer: false };
+  page.win.confirm = () => {
+    dialog.asked++;
+    return dialog.answer;
+  };
+  const go = async (path: string) => {
+    page.win.location.hash = path;
+    await wait(ROUTE_WAIT);
+  };
   return {
     ...page,
-    text,
-    row: (id: number) => doc.querySelector<HTMLElement>(`[data-entry-id="${id}"]`),
+    dialog,
+    go,
+    text: (selector: string) => $(doc, selector).textContent,
     titles: () => Array.from(doc.querySelectorAll(".task-title"), el => el.textContent),
-    add: async (title: string, amount: string) => {
+    click: async (selector: string) => {
+      $(doc, selector).click();
+      await wait(ROUTE_WAIT);
+    },
+    fill: async (title: string, amount: string) => {
       typeInto($<HTMLInputElement>(doc, "#entry-title"), title);
       typeInto($<HTMLInputElement>(doc, "#entry-amount"), amount);
-      await wait();
-      $(doc, "#entry-add").click();
       await wait();
     },
     close: () => {
@@ -722,111 +729,194 @@ async function budget() {
   };
 }
 
-test("가계부: 이번 달 합계와 분류별 지출을 보여 준다", async () => {
+test("가계부: 월별 내역에 합계와 분류별 지출을 보여 준다", async () => {
   const p = await budget();
   assert.equal(p.text("#sum-income"), "2,500,000원");
   assert.equal(p.text("#sum-expense"), "145,000원");
   assert.equal(p.text("#sum-balance"), "2,355,000원");
-  const categories = Array.from(p.doc.querySelectorAll<HTMLElement>(".budget-chart li"), li => li.dataset.category);
-  assert.equal(categories.join(), "식비,교통,여가");
+  const rows = Array.from(p.doc.querySelectorAll<HTMLElement>(".budget-chart li"), li => li.dataset.row);
+  assert.equal(rows.join(), "식비,교통,여가");
   assert.equal(p.doc.querySelector(".budget-chart rect")!.getAttribute("width"), "100%");
   assert.equal(p.doc.querySelector(".budget-chart rect")!.namespaceURI, "http://www.w3.org/2000/svg");
+  assert.equal($(p.doc, '.budget-nav a[aria-current="page"]').textContent, "월별 내역");
   p.close();
 });
 
-test("가계부: 항목을 추가하면 합계가 바뀌고 입력창이 비며 금액이 잘못되면 추가할 수 없다", async () => {
+test("가계부: 달을 옮기면 내역이 바뀌고, 내역이 없으면 안내한다", async () => {
   const p = await budget();
-  const button = $<HTMLButtonElement>(p.doc, "#entry-add");
-  typeInto($<HTMLInputElement>(p.doc, "#entry-title"), "커피");
-  typeInto($<HTMLInputElement>(p.doc, "#entry-amount"), "-5");
-  await wait();
-  assert.equal(button.disabled, true);
-
-  await p.add("커피", "5000");
-  assert.equal(p.text("#sum-expense"), "150,000원");
-  assert.ok(p.titles().includes("커피"));
-  assert.equal($<HTMLInputElement>(p.doc, "#entry-title").value, "");
-  assert.equal($<HTMLInputElement>(p.doc, "#entry-amount").value, "");
-  p.close();
-});
-
-test("가계부: 다른 달의 항목을 추가하면 그 달로 이동한다", async () => {
-  const p = await budget();
-  typeInto($<HTMLInputElement>(p.doc, "#entry-date"), "2020-03-15");
-  await p.add("과거 지출", "1000");
-  await wait(ROUTE_WAIT);
-  assert.equal(p.win.location.hash, "#/budget/2020-03");
-  assert.equal(p.text("#month-label"), "2020년 3월");
-  assert.equal(p.titles().join(), "과거 지출");
-  p.close();
-});
-
-test("가계부: 수정 모드는 항목별로 유지되고 다른 항목이 바뀌어도 사라지지 않는다", async () => {
-  const p = await budget();
-  const row = p.row(2)!;
-  row.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
-  await wait();
-  const input = row.querySelector<HTMLInputElement>('input[aria-label="내용 수정"]')!;
-  assert.equal(input.value, "장보기");
-  assert.equal(p.doc.querySelectorAll(".budget-edit").length, 2);
-
-  typeInto(input, "작성 중");
-  await wait();
-  p.row(5)!.querySelector<HTMLButtonElement>('[data-action="remove"]')!.click();
-  await wait();
-  assert.equal(p.row(5), null);
-  assert.equal(p.row(2), row, "같은 DOM 노드여야 합니다.");
-  assert.equal(row.querySelector<HTMLInputElement>('input[aria-label="내용 수정"]'), input);
-  assert.equal(input.value, "작성 중");
-  p.close();
-});
-
-test("가계부: 저장하면 반영하고 취소하면 원래 값으로 돌아간다", async () => {
-  const p = await budget();
-  const row = p.row(4)!;
-  const edit = async (amount: string, action: string) => {
-    row.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
-    await wait();
-    typeInto(row.querySelector<HTMLInputElement>('input[aria-label="금액 수정"]')!, amount);
-    await wait();
-    row.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!.click();
-    await wait();
-  };
-
-  await edit("99999", "cancel");
-  assert.equal(p.text("#sum-expense"), "145,000원");
-
-  row.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
-  await wait();
-  const KeyboardEventOf = (p.win as Window & typeof globalThis).KeyboardEvent;
-  row.querySelector("input")!.dispatchEvent(new KeyboardEventOf("keydown", { key: "Escape", bubbles: true }));
-  await wait();
-  assert.equal(row.querySelector("input"), null, "Esc로 수정을 취소해야 합니다.");
-
-  await edit("25000", "save");
-  assert.equal(p.text("#sum-expense"), "155,000원");
-  assert.ok(row.textContent!.includes("-25,000원"), row.textContent!);
-  p.close();
-});
-
-test("가계부: 달을 옮기면 내역과 차트가 바뀌고, 내역이 없으면 안내한다", async () => {
-  const p = await budget();
-  $(p.doc, "#month-prev").click();
-  await wait(ROUTE_WAIT);
+  await p.click("#month-prev");
   assert.equal(p.titles().join(), "전기 요금,월급");
   assert.equal(p.text("#sum-expense"), "42,000원");
 
-  $(p.doc, "#month-prev").click();
-  await wait(ROUTE_WAIT);
+  await p.click("#month-prev");
   assert.equal(p.titles().length, 0);
   assert.ok(p.doc.querySelector("#empty-state") !== null);
   assert.equal(p.doc.querySelector(".budget-chart"), null);
   p.close();
 });
 
+test("가계부: 추가 페이지에서 저장하면 월별 내역으로 돌아와 반영되고, 뒤로가기로 양식에 돌아가지 않는다", async () => {
+  const p = await budget();
+  await p.click("#add-entry");
+  const submit = $<HTMLButtonElement>(p.doc, "#entry-submit");
+  assert.equal(p.win.location.hash.startsWith("#/budget/new"), true);
+  assert.equal(submit.disabled, true);
+
+  await p.fill("커피", "-5");
+  assert.equal(submit.disabled, true);
+
+  await p.fill("커피", "5000");
+  assert.equal(submit.disabled, false);
+  await p.click("#entry-submit");
+  assert.equal(p.dialog.asked, 0, "저장한 뒤에는 묻지 않아야 합니다.");
+  assert.equal(p.text("#sum-expense"), "150,000원");
+  assert.ok(p.titles().includes("커피"));
+
+  p.win.history.back();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.doc.querySelector("#entry-title"), null);
+  p.close();
+});
+
+test("가계부: 다른 달을 보다가 추가하면 그 달이 기본 날짜이고, 다른 날짜로 저장하면 그 달로 간다", async () => {
+  const p = await budget();
+  await p.go("/budget/new/2020-03");
+  assert.equal($<HTMLInputElement>(p.doc, "#entry-date").value, "2020-03-01");
+
+  typeInto($<HTMLInputElement>(p.doc, "#entry-date"), "2021-07-15");
+  await p.fill("과거 지출", "1000");
+  await p.click("#entry-submit");
+  assert.equal(p.win.location.hash, "#/budget/2021-07");
+  assert.equal(p.text("#month-label"), "2021년 7월");
+  assert.equal(p.titles().join(), "과거 지출");
+  p.close();
+});
+
+test("가계부: 작성 중에 떠나면 묻고, 취소하면 내용을 유지한다", async () => {
+  const p = await budget();
+  await p.go("/budget/new");
+  await p.fill("작성 중", "");
+  const input = $<HTMLInputElement>(p.doc, "#entry-title");
+
+  await p.click('.budget-nav a[href="#/budget/stats"]');
+  assert.equal(p.dialog.asked, 1);
+  assert.equal($(p.doc, "#entry-title"), input);
+  assert.equal(input.value, "작성 중");
+
+  p.dialog.answer = true;
+  await p.click('.budget-nav a[href="#/budget/stats"]');
+  assert.equal(p.dialog.asked, 2);
+  assert.ok(p.doc.querySelector("#stats-months") !== null);
+
+  await p.go("/budget");
+  assert.equal(p.dialog.asked, 2, "다른 페이지에서는 묻지 않아야 합니다.");
+  p.close();
+});
+
+test("가계부: 목록의 항목을 누르면 상세로 가고 메모를 보여 준다", async () => {
+  const p = await budget();
+  await p.click('[data-entry-id="2"] a');
+  assert.equal(p.win.location.hash, "#/budget/entries/2");
+  assert.equal(p.text("#entry-heading"), "장보기");
+  assert.equal(p.text("#entry-detail-amount"), "-68,000원");
+  assert.equal(p.text("#entry-detail-memo"), "일주일 치 식재료");
+  p.close();
+});
+
+test("가계부: 없는 항목은 상세와 수정 모두 안내를 보여 준다", async () => {
+  const p = await budget();
+  await p.go("/budget/entries/999");
+  assert.ok(p.doc.querySelector("#entry-missing") !== null);
+  await p.go("/budget/entries/999/edit");
+  assert.ok(p.doc.querySelector("#entry-missing") !== null);
+  assert.equal(p.doc.querySelector("#entry-title"), null);
+  p.close();
+});
+
+test("가계부: 수정을 저장하면 상세와 합계에 반영되고, 취소하면 그대로다", async () => {
+  const p = await budget();
+  await p.go("/budget/entries/4");
+  await p.click("#entry-edit");
+  assert.equal($<HTMLInputElement>(p.doc, "#entry-title").value, "영화");
+
+  await p.click("#entry-cancel");
+  assert.equal(p.dialog.asked, 0, "고치지 않았으면 묻지 않아야 합니다.");
+  assert.equal(p.win.location.hash, "#/budget/entries/4");
+
+  await p.click("#entry-edit");
+  await p.fill("영화 관람", "25000");
+  await p.click("#entry-submit");
+  assert.equal(p.dialog.asked, 0);
+  assert.equal(p.win.location.hash, "#/budget/entries/4");
+  assert.equal(p.text("#entry-heading"), "영화 관람");
+  assert.equal(p.text("#entry-detail-amount"), "-25,000원");
+
+  await p.go("/budget");
+  assert.equal(p.text("#sum-expense"), "155,000원");
+  p.close();
+});
+
+test("가계부: 수정 중 주소의 id만 바뀌면 그 항목의 값을 보여 준다", async () => {
+  const p = await budget();
+  await p.go("/budget/entries/4/edit");
+  await p.fill("고치던 값", "1");
+  p.dialog.answer = true;
+  await p.go("/budget/entries/5/edit");
+  assert.equal($<HTMLInputElement>(p.doc, "#entry-title").value, "점심");
+  assert.equal($<HTMLInputElement>(p.doc, "#entry-amount").value, "12000");
+  p.close();
+});
+
+test("가계부: 삭제는 확인을 거치고, 삭제 후 뒤로가기로 지운 항목에 돌아가지 않는다", async () => {
+  const p = await budget();
+  await p.click('[data-entry-id="5"] a');
+  await p.click("#entry-remove");
+  assert.equal(p.dialog.asked, 1);
+  assert.equal(p.text("#entry-heading"), "점심");
+
+  p.dialog.answer = true;
+  await p.click("#entry-remove");
+  assert.ok(!p.titles().includes("점심"));
+  assert.equal(p.text("#sum-expense"), "133,000원");
+
+  p.win.history.back();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.doc.querySelector("#entry-heading"), null);
+  p.close();
+});
+
+test("가계부: 통계는 최근 6개월과 전체 분류를 보여 주고 달을 누르면 그 달로 간다", async () => {
+  const p = await budget();
+  await p.click('.budget-nav a[href="#/budget/stats"]');
+  const months = p.doc.querySelectorAll("#stats-months li");
+  assert.equal(months.length, 6);
+  assert.ok(months[5].textContent!.includes("145,000원"), months[5].textContent!);
+  assert.ok(months[4].textContent!.includes("42,000원"), months[4].textContent!);
+
+  const categories = Array.from(p.doc.querySelectorAll<HTMLElement>("#stats-categories li"), li => li.dataset.row);
+  assert.equal(categories.join(), "식비,교통,생활,여가");
+
+  months[4].querySelector("a")!.click();
+  await wait(ROUTE_WAIT);
+  assert.equal(p.titles().join(), "전기 요금,월급");
+  p.close();
+});
+
+test("가계부: 내역이 없어도 통계가 깨지지 않는다", async () => {
+  localStorage.setItem(BUDGET_STORAGE_KEY, "[]");
+  const page = await openPage("./index.html?board=e2e#/budget/stats");
+  const widths = Array.from(page.doc.querySelectorAll("#stats-months rect"), rect => rect.getAttribute("width"));
+  assert.equal(widths.join(), "0%,0%,0%,0%,0%,0%");
+  assert.equal(page.doc.querySelector("#stats-categories .budget-chart"), null);
+  page.frame.remove();
+  localStorage.removeItem(BUDGET_STORAGE_KEY);
+});
+
 test("가계부: 다시 열어도 저장되어 있고, 저장값이 잘못되면 예시 내역으로 시작한다", async () => {
   const p = await budget();
-  await p.add("저장 확인", "1000");
+  await p.go("/budget/new");
+  await p.fill("저장 확인", "1000");
+  await p.click("#entry-submit");
   p.frame.contentWindow!.location.reload();
   await wait(50);
   await waitForReady(p.frame);
@@ -839,6 +929,17 @@ test("가계부: 다시 열어도 저장되어 있고, 저장값이 잘못되면
   assert.equal(page.doc.querySelector("#sum-income")!.textContent, "2,500,000원");
   page.frame.remove();
   localStorage.removeItem(BUDGET_STORAGE_KEY);
+});
+
+test("가계부: 다른 탭에서 바꾼 내역을 반영한다", async () => {
+  const p = await budget();
+  const win = p.win as Window & typeof globalThis;
+  const entries = [{ id: 1, date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`, title: "다른 탭", amount: 1, category: "식비" }];
+  localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(entries));
+  win.dispatchEvent(new win.StorageEvent("storage", { key: BUDGET_STORAGE_KEY }));
+  await wait();
+  assert.equal(p.titles().join(), "다른 탭");
+  p.close();
 });
 
 test("Phase 2: 다시 열어도 할 일이 저장되어 있다", async () => {

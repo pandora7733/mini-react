@@ -1,7 +1,7 @@
 import { h } from "../createElement.js";
 import { useEffect } from "../hooks.js";
 import { Link, Route, Routes, startRouter } from "../router.js";
-import { Budget } from "./budget.js";
+import { EditEntryPage, EntryPage, MonthPage, NewEntryPage, StatsPage } from "./budget/pages.js";
 import { Phase1Page } from "./phase1.js";
 import { Phase2Page } from "./phase2.js";
 
@@ -27,7 +27,7 @@ function Home() {
         </Link>
         <Link className="link-card" to="/budget">
           <strong>예시 앱. 가계부</strong>
-          <span>커스텀 훅, 라우트 파라미터, SVG 차트까지 mini-react만으로 만든 앱입니다.</span>
+          <span>월별 내역, 항목 상세와 수정, 통계를 라우트로 나눈 앱입니다. mini-react만으로 만들었습니다.</span>
         </Link>
         {/* 테스트 러너는 앱과 분리된 별도 문서이므로 라우트가 아니다 */}
         <a className="link-card" href="./tests.html">
@@ -59,7 +59,12 @@ startRouter(
     <Route path="/" element={<Home />} />
     <Route path="/phase1" element={<Phase1Page />} />
     <Route path="/phase2" element={<Phase2Page />} />
-    <Route path="/budget/:month?" element={<Budget />} />
+    {/* 먼저 선언한 라우트가 이기므로 고정 경로를 파라미터 경로보다 앞에 둔다 */}
+    <Route path="/budget/new/:month?" element={<NewEntryPage />} />
+    <Route path="/budget/stats" element={<StatsPage />} />
+    <Route path="/budget/entries/:id/edit" element={<EditEntryPage />} />
+    <Route path="/budget/entries/:id" element={<EntryPage />} />
+    <Route path="/budget/:month?" element={<MonthPage />} />
     <Route path="*" element={<NotFound />} />
   </Routes>,
   document.getElementById("root")!,

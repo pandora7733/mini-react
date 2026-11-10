@@ -536,29 +536,99 @@ dd {
   font-variant-numeric: tabular-nums;
 }
 
-.task-form input.budget-number {
-  flex: 1 1 110px;
+.budget-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
-.task-form input.budget-date {
-  flex: 0 1 150px;
+.budget-nav a {
+  color: var(--muted);
+  text-decoration: none;
 }
 
-.budget-edit {
-  flex: 1 1 120px;
-  min-width: 0;
-  padding: 2px 8px;
+.budget-nav a:hover {
+  color: var(--text);
+}
+
+.budget-nav a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.budget-chart a {
+  color: inherit;
+}
+
+a.budget-button {
+  display: inline-block;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
 }
 
-.task:has(.budget-amount) {
-  flex-wrap: wrap;
+a.budget-button:hover {
+  border-color: var(--accent);
 }
 
-.task:has(.budget-edit) {
+.budget-actions {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.budget-form {
+  display: grid;
+  gap: 4px;
+}
+
+.budget-form label {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.budget-form input, .budget-form select, .budget-form textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.budget-form .budget-actions {
+  margin-top: 16px;
+}
+
+.budget-detail {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.budget-detail div {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.budget-detail dd {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.task-list a.task-title {
+  color: inherit;
 }
 
 /* 테스트 */

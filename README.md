@@ -19,7 +19,7 @@ npm run serve
 |---|---|
 | `/#/phase1` | Diff 검증 페이지 |
 | `/#/phase2` | Focus Board |
-| `/#/budget`, `/#/budget/2026-11` | 예시 앱: 가계부 |
+| `/#/budget`, `/#/budget/2026-11`, `/#/budget/stats` | 예시 앱: 가계부 |
 | `/tests.html` | 브라우저 단위 테스트와 기능 테스트 (앱과 분리된 별도 문서) |
 
 ## 구조
@@ -92,12 +92,21 @@ startRouter(<Routes>...</Routes>, root, { rootOnlyHooks: true });   // 페이지
 
 ## 예시 앱: 가계부
 
-`src/pages/budget.tsx`는 mini-react를 라이브러리처럼 써서 만든 앱입니다.
+`src/pages/budget/`은 mini-react와 라우터를 라이브러리처럼 써서 만든 여러 페이지 앱입니다.
 
-- **Lifting State Up:** 입력 중인 값과 항목별 수정 모드까지 모두 루트 `Budget`에 두고, `EntryForm`과 `EntryRow`는 props만 받습니다.
-- **커스텀 훅:** `useStoredState`는 `useState`와 `useEffect`를 묶어 `localStorage`에 저장되는 상태를 만듭니다.
-- **라우트 파라미터:** 선택한 달은 상태가 아니라 주소(`/budget/:month?`)에 있어서, 뒤로가기와 직접 접속이 그대로 동작합니다.
-- **그 외:** Fragment, `key`로 재사용되는 목록, SVG 막대 차트, `useMemo`로 계산한 합계.
+| 경로 | 페이지 | 쓰인 라우터 기능 |
+|---|---|---|
+| `/budget/:month?` | 월별 내역 | 선택 파라미터. 달을 상태가 아니라 주소에 둠 |
+| `/budget/new/:month?` | 항목 추가 | `replace` 이동, 작성 중 이탈 확인 |
+| `/budget/entries/:id` | 항목 상세, 삭제 | 필수 파라미터, 없는 id 처리 |
+| `/budget/entries/:id/edit` | 항목 수정 | 파라미터 변경 대응, 작성 중 이탈 확인 |
+| `/budget/stats` | 통계 | 차트 항목에서 월별 내역으로 이동 |
+
+- **페이지가 곧 루트입니다.** 훅과 상태는 `pages.tsx`의 페이지에만 있고, `ui.tsx`의 컴포넌트는 props만 받습니다(Lifting State Up).
+- **페이지끼리는 저장소로 공유합니다.** 라우트가 바뀌면 이전 루트의 상태가 사라지므로, 내역은 `store.ts`의 저장소에 두고 페이지마다 읽습니다. 다른 탭에서 바꾼 내역도 `storage` 이벤트로 반영합니다.
+- **커스텀 훅:** `useEntries`, `useTitle`, `useLeaveConfirm`은 일반 함수 안에서 기존 훅을 호출합니다. 페이지에서 호출하므로 제약에 맞습니다.
+- **라우트 순서:** 먼저 선언한 라우트가 이기므로 `/budget/stats`를 `/budget/:month?`보다 앞에 둡니다.
+- **그 외:** `key`로 재사용되는 목록, SVG 막대 차트, `useMemo`로 계산한 합계.
 
 ## 라우터
 
@@ -107,7 +116,8 @@ startRouter(<Routes>...</Routes>, root, { rootOnlyHooks: true });   // 페이지
 startRouter(
   <Routes>
     <Route path="/" element={<Home />} />
-    <Route path="/budget/:month?" element={<Budget />} />
+    <Route path="/budget/entries/:id" element={<EntryPage />} />
+    <Route path="/budget/:month?" element={<MonthPage />} />
     <Route path="*" element={<NotFound />} />
   </Routes>,
   document.getElementById("root")!,
@@ -116,7 +126,7 @@ startRouter(
 
 <Link to="/budget">가계부</Link>
 
-function Budget({ params }) { params.month; }   // 파라미터는 페이지의 props로 받는다
+function MonthPage({ params }) { params.month; }   // 파라미터는 페이지의 props로 받는다
 navigate("/budget/2026-11");   // { replace: true }로 기록을 남기지 않을 수 있고, navigate(-1)은 뒤로가기
 setLeaveGuard(() => confirm("떠날까요?"));     // false를 돌려주면 라우트 이동을 취소한다
 ```
