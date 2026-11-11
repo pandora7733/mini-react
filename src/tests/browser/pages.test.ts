@@ -1196,11 +1196,22 @@ test("자판기: 캔은 진열칸 그 자리에서 곧장 아래로, 중력처�
     const rect = can.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: rect.width, h: rect.height };
   };
+  const center = (rect: DOMRect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+  // 자판기가 3D로 기울어 있어도 진열칸 캔 자리에서 출발한다
+  const tilted = center($(doc, '[data-drink="midnight"] .vm-can').getBoundingClientRect());
+  const start = sample(0);
+  assert.ok(Math.abs(start.x - tilted.x) < 1.5 && Math.abs(start.y - tilted.y) < 1.5, "기울어진 자판기에서도 진열칸에서 출발해야 합니다.");
+
+  // 낙하 궤적은 원근 없이 정면에서 잰다
+  const tilt = $(doc, ".vm-tilt");
+  tilt.style.transition = "none";
+  tilt.style.transform = "none";
   const slot = $(doc, '[data-drink="midnight"] .vm-can').getBoundingClientRect();
   const [t0, t1, t2, t3] = [0, 80, 160, 240].map(sample);
 
   // 출발점은 진열칸의 캔, 크기는 1:1
-  assert.ok(Math.abs(t0.x - (slot.left + slot.width / 2)) < 1 && Math.abs(t0.y - (slot.top + slot.height / 2)) < 1, "진열칸에서 출발해야 합니다.");
+  // 출발점은 레이아웃 좌표(정수 px)로 재므로 1px 남짓 어긋날 수 있다
+  assert.ok(Math.abs(t0.x - (slot.left + slot.width / 2)) < 1.5 && Math.abs(t0.y - (slot.top + slot.height / 2)) < 1.5, "진열칸에서 출발해야 합니다.");
   assert.ok(Math.abs(t0.w - slot.width) < 1 && Math.abs(t0.h - slot.height) < 1, "진열칸 캔과 같은 크기여야 합니다.");
   // 자유 낙하 동안 옆으로 움직이거나 돌지 않는다
   assert.ok([t1, t2, t3].every(point => Math.abs(point.x - t0.x) < 0.5 && Math.abs(point.w - t0.w) < 0.5), "곧장 아래로 떨어져야 합니다.");

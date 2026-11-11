@@ -734,11 +734,15 @@ function VendingMachine(props: {
   const stateLabel = exploded ? "파손" : broken ? "고장" : machine === "hacking" ? "침입 감지" : "정상 영업";
 
   return (
-    // 바깥 두 겹: 번지는 형광 빛(vm-frame)과 형광 테두리(vm-edge). 깎은 모서리 때문에 테두리를 겹으로 만든다
-    <div
-      className={`vm-frame dmg is-${machine}${warning ? " is-warning" : ""}`}
-      style={damaged(OFFSETS.machine, wreck)}
-    >
+    // 3D 캐비닛: 무대(원근) > 기울기(마우스) > 몸체(파손 변위). 몸체 안에 옆면, 윗면과 앞면(vm-frame)이 있다.
+    // 앞면의 바깥 두 겹은 번지는 형광 빛(vm-frame)과 형광 테두리(vm-edge). 깎은 모서리 때문에 테두리를 겹으로 만든다
+    <div className="vm-stage">
+     <div className="vm-tilt">
+      <div className={`vm-rig dmg is-${machine}`} style={damaged(OFFSETS.machine, wreck)}>
+      <span className="vm-face vm-face-left" aria-hidden="true" />
+      <span className="vm-face vm-face-right" aria-hidden="true" />
+      <span className="vm-face vm-face-top" aria-hidden="true" />
+    <div className={`vm-frame is-${machine}${warning ? " is-warning" : ""}`}>
       <div className="vm-edge">
         <section id="vending" className={`vm is-${machine}`} aria-label="자판기">
           {/* 위쪽 조명 간판 */}
@@ -905,6 +909,9 @@ function VendingMachine(props: {
       </div>
       {exploded && <Blast />}
     </div>
+      </div>
+     </div>
+    </div>
   );
 }
 
@@ -1052,14 +1059,33 @@ function centerOf(element: Element): { x: number; y: number } {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
+// 레이아웃 좌표(변환 전)로 잰 중심. 자판기는 3D로 기울어 있어 화면 좌표의 차이를 앞면 안의 이동으로 쓰면 어긋난다
+function layoutCenter(element: HTMLElement, root: HTMLElement): { x: number; y: number } {
+  let x = element.offsetWidth / 2;
+  let y = element.offsetHeight / 2;
+  let node: HTMLElement | null = element;
+  while (node !== null && node !== root) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+    // offsetLeft는 부모의 테두리 안쪽에서 재므로 중간 부모의 테두리 두께를 더한다 (유리창 테두리 6px)
+    if (node !== null && node !== root) {
+      x += node.clientLeft;
+      y += node.clientTop;
+    }
+  }
+  return { x, y };
+}
+
 function animateFall(can: TrayCan): Promise<void> {
   const element = document.querySelector<HTMLElement>(`[data-can-key="${can.key}"]`);
   const source = document.querySelector<HTMLElement>(`[data-drink="${can.drinkId}"] .vm-can`);
   if (element === null || source === null || typeof element.animate !== "function") return Promise.resolve();
 
   // 좌표는 모두 최종 자리의 중심을 원점으로 한다 (아래가 +y)
-  const from = centerOf(source);
-  const to = centerOf(element);
+  const frame = element.closest<HTMLElement>(".vm-frame");
+  const from = frame ? layoutCenter(source, frame) : centerOf(source);
+  const to = frame ? layoutCenter(element, frame) : centerOf(element);
   const startX = from.x - to.x;
   const startY = from.y - to.y;
   // 선 채로 바닥에 닿으면 누운 자리보다 중심이 높다
@@ -1265,6 +1291,14 @@ export function Home() {
     animatedPile.clear();
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
+    // 3D 시차: 포인터 위치를 -1~1로 루트에 적어 두면 자판기 기울기와 배경 층의 깊이가 CSS에서 따라온다
+    const root = document.documentElement;
+    const onPointer = (event: PointerEvent) => {
+      if (reducedMotion()) return;
+      root.style.setProperty("--cp-px", ((event.clientX / window.innerWidth) * 2 - 1).toFixed(3));
+      root.style.setProperty("--cp-py", ((event.clientY / window.innerHeight) * 2 - 1).toFixed(3));
+    };
+    window.addEventListener("pointermove", onPointer);
     let link = document.getElementById(FONT_ID);
     if (link === null) {
       const created = document.createElement("link");
@@ -1277,6 +1311,9 @@ export function Home() {
     const fonts = link;
     return () => {
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("pointermove", onPointer);
+      root.style.removeProperty("--cp-px");
+      root.style.removeProperty("--cp-py");
       document.body.classList.remove("cp-body", "cp-menu-open");
       fonts.remove();
     };
