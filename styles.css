@@ -2987,22 +2987,33 @@ a.budget-button:hover {
 /* --- 3D: 기존 색과 모양은 그대로 두고 깊이만 더한다 ---
    빛은 왼쪽 위에서 온다(캔 음영과 같은 방향). 그래서 두께와 그림자는 오른쪽 아래로 생긴다. */
 
-/* 자판기 캐비닛: 원근 무대 위에서 살짝 돌아 서 있고, 포인터를 따라 몇 도 기운다 */
+/* 자판기 캐비닛: 원근 무대 위의 진짜 3D 상자. 누른 채 끌어서 돌린다 */
 .vm-stage {
   position: relative;
-  padding: 6px 0 28px;
-  perspective: 2400px;
-  perspective-origin: 0% -140px;   /* 왼쪽 위에서 내려다본다: 왼쪽 옆면과 윗면이 보인다 */
+  padding: 110px 0 8px;   /* 지붕 안테나 자리 */
+  perspective: 1900px;
+  perspective-origin: 50% 35%;
+  cursor: grab;
+  touch-action: pan-y;    /* 터치에서는 가로로 끌면 돌고, 세로로 밀면 화면이 넘어간다 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.vm-stage.is-dragging {
+  cursor: grabbing;
 }
 
 .vm-tilt {
   transform-style: preserve-3d;
-  transform: rotateX(calc(-3deg + var(--cp-py, 0) * -3deg)) rotateY(calc(16deg + var(--cp-px, 0) * 6deg));
-  transition: transform 500ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  transform: rotateX(var(--vm-rx, -10deg)) rotateY(var(--vm-ry, 22deg));
+}
+
+.vm-tilt.is-resetting {
+  transition: transform 700ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 .vm-rig {
-  --vm-depth: 110px;
+  --vm-depth: 150px;
   --vm-side-signal: var(--vm-cyan);
   position: relative;
   max-width: 640px;
@@ -3014,6 +3025,78 @@ a.budget-button:hover {
 .vm-rig.is-broken { --vm-side-signal: var(--vm-red); }
 .vm-rig.is-exploded { --vm-side-signal: #7a2232; }
 
+/* 3D가 이어지도록 앞면의 모든 층을 평면으로 눌러 버리지 않는다 */
+.vm-frame,
+.vm-edge,
+.vm,
+.vm-body,
+.vm-window,
+.vm-shelf,
+.vm-shelf > li,
+.vm-item,
+.vm-sign,
+.vm-panel,
+.vm-keypad,
+.vm-key,
+.vm-tray,
+.vm-tray-box,
+.vm-base {
+  transform-style: preserve-3d;
+}
+
+.vm-frame {
+  isolation: auto;
+}
+
+/* 번지는 형광 빛은 캐비닛 뒤 벽에 비친다. 뒤에서 볼 때는 뒷면을 가리지 않게 숨긴다 */
+.vm-frame::before {
+  transform: translateZ(calc(var(--vm-depth) * -1 - 12px));
+  backface-visibility: hidden;
+}
+
+.vm-frame.is-exploded::before {
+  animation: vm-burst3d 1.6s ease-out 1 forwards;
+}
+
+.vm-edge {
+  clip-path: none;
+  background: none;
+}
+
+.vm {
+  clip-path: none;
+  background: none;
+}
+
+/* 앞면 철판: 유리창과 꺼내는 곳 자리에 구멍이 뚫려 있다(구멍 위치는 스크립트가 잰다) */
+.vm-bezel {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px padding-box,
+    linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px padding-box,
+    linear-gradient(90deg, #050608, #0c0e14 50%, #050608) padding-box,
+    linear-gradient(135deg, var(--vm-signal), var(--vm-magenta) 50%, var(--vm-signal)) border-box;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) var(--win-x, 0) var(--win-y, 0) / var(--win-w, 0) var(--win-h, 0) no-repeat,
+    linear-gradient(#000 0 0) var(--tray-x, 0) var(--tray-y, 0) / var(--tray-w, 0) var(--tray-h, 0) no-repeat,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) var(--win-x, 0) var(--win-y, 0) / var(--win-w, 0) var(--win-h, 0) no-repeat exclude,
+    linear-gradient(#000 0 0) var(--tray-x, 0) var(--tray-y, 0) / var(--tray-w, 0) var(--tray-h, 0) no-repeat exclude,
+    linear-gradient(#000 0 0);
+}
+
+.vm::after {
+  mix-blend-mode: normal;
+  opacity: 0.6;
+  animation-name: vm-sweep3d;
+}
+
+/* 여섯 면: 앞면(z=0)에서 뒤로 --vm-depth만큼 */
 .vm-face {
   position: absolute;
   pointer-events: none;
@@ -3041,7 +3124,6 @@ a.budget-button:hover {
 
 .vm-face-right {
   right: 0;
-  bottom: 22px;   /* 앞면의 깎은 모서리 높이만큼 짧다 */
   transform-origin: right center;
   transform: rotateY(-90deg);
 }
@@ -3060,80 +3142,412 @@ a.budget-button:hover {
   box-shadow: inset 0 2px 0 var(--vm-side-signal), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
+.vm-face-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--vm-depth);
+  transform-origin: bottom center;
+  transform: rotateX(90deg);
+  background: #030305;
+}
+
+.vm-face-back {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: translateZ(calc(var(--vm-depth) * -1)) rotateY(180deg);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 7px, rgba(0, 0, 0, 0.6) 7px 10px) 50% 88% / 60% 120px no-repeat,
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, #0b0d13, #14171f 50%, #0b0d13);
+  box-shadow: inset 0 0 0 2px var(--vm-side-signal);
+}
+
+.vm-face-back b {
+  color: color-mix(in srgb, var(--vm-magenta) 70%, transparent);
+  font-family: var(--cp-display);
+  font-size: 30px;
+  letter-spacing: 0.2em;
+  writing-mode: vertical-rl;
+  text-shadow: 0 0 12px var(--vm-magenta);
+}
+
 .vm-rig.is-exploded .vm-face {
   filter: brightness(0.55) saturate(0.6);
 }
 
-/* 바닥에 떨어지는 그림자와 형광 반사 */
-.vm-stage::after {
-  content: "";
+/* 두께 공용: 부모의 --d만큼 뒤로 뻗는 네 옆면 */
+.vm-edges {
   position: absolute;
-  left: 4%;
-  right: -2%;
-  bottom: 4px;
-  z-index: -1;
-  height: 46px;
-  background:
-    radial-gradient(ellipse at 45% 40%, rgba(0, 0, 0, 0.85), transparent 70%),
-    radial-gradient(ellipse at 45% 60%, rgba(0, 240, 255, 0.18), transparent 72%);
-  filter: blur(6px);
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
 }
 
-@media (max-width: 600px) {
-  .vm-rig {
-    --vm-depth: 60px;
-  }
-
-  .vm-tilt {
-    transform: rotateY(5deg);
-  }
+.vm-edges > i {
+  position: absolute;
 }
 
-/* 캐비닛 앞면의 부품도 튀어나오거나 들어가 보이게 한다 */
+.vm-edges .t {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--d, 6px);
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  background: var(--edge-t, #2b303d);
+}
+
+.vm-edges .b {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--d, 6px);
+  transform-origin: bottom center;
+  transform: rotateX(90deg);
+  background: var(--edge-b, #07080b);
+}
+
+.vm-edges .l {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--d, 6px);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  background: var(--edge-l, #1a1d27);
+}
+
+.vm-edges .r {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: var(--d, 6px);
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  background: var(--edge-b, #07080b);
+}
+
+/* 간판: 앞으로 22px 튀어나온 빛 상자. 옆면도 형광으로 번진다 */
 .vm-sign {
-  box-shadow:
-    inset 0 0 22px color-mix(in srgb, var(--vm-signal) 22%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 5px 0 #08030c,
-    0 8px 14px rgba(0, 0, 0, 0.7);
+  position: relative;
+  --d: 22px;
+  --edge-t: linear-gradient(180deg, #3a1446, #12051a);
+  --edge-l: linear-gradient(90deg, color-mix(in srgb, var(--vm-magenta) 55%, #12051a), #12051a);
+  --edge-b: #0a0310;
+  translate: 0 0 22px;
 }
 
-.vm-panel {
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.07), inset -2px -2px 0 rgba(0, 0, 0, 0.6), 3px 3px 0 #050608;
-}
-
+/* 유리창: 철판 구멍 뒤로 78px 들어간 진열 공간 */
 .vm-window {
-  box-shadow:
-    inset 0 0 30px rgba(0, 0, 0, 0.9),
-    inset 8px 8px 18px rgba(0, 0, 0, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    1px 1px 0 rgba(255, 255, 255, 0.06);
+  translate: 0 0 1px;
+  background: none;
+  box-shadow: none;
 }
 
-.vm-display {
-  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vm-signal) 22%, transparent), inset 3px 3px 6px rgba(0, 0, 0, 0.9);
+.vm-cave {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
 }
 
+.vm-cave.window { --cave: 78px; }
+.vm-cave.tray { --cave: 52px; }
+
+.vm-cave > i {
+  position: absolute;
+}
+
+.vm-cave .back {
+  inset: 0;
+  transform: translateZ(calc(var(--cave) * -1));
+  background:
+    linear-gradient(180deg, rgba(0, 240, 255, 0.16), transparent 45%),
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 100% 20px,
+    #05060a;
+}
+
+.vm-cave .left,
+.vm-cave .right {
+  top: 0;
+  bottom: 0;
+  width: var(--cave);
+  background:
+    linear-gradient(180deg, rgba(0, 240, 255, 0.12), transparent 40%),
+    linear-gradient(90deg, #171a25, #07080c);
+}
+
+.vm-cave .left {
+  left: 0;
+  transform-origin: left center;
+  transform: rotateY(90deg);
+}
+
+.vm-cave .right {
+  right: 0;
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+}
+
+.vm-cave .top,
+.vm-cave .bottom {
+  left: 0;
+  right: 0;
+  height: var(--cave);
+}
+
+/* 천장 앞쪽의 LED 조명 띠 */
+.vm-cave .top {
+  top: 0;
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  background: linear-gradient(180deg, #d8fbff 0 2px, rgba(0, 240, 255, 0.55) 2px 6px, rgba(0, 240, 255, 0.12) 6px 22px, #0b0d14 40px);
+}
+
+.vm-cave .bottom {
+  bottom: 0;
+  transform-origin: bottom center;
+  transform: rotateX(90deg);
+  background: linear-gradient(0deg, #1c202b, #090a0f);
+}
+
+.vm-cave.tray .back {
+  background: linear-gradient(180deg, #000, #0b0d12);
+}
+
+.vm-cave.tray .bottom {
+  background:
+    linear-gradient(0deg, color-mix(in srgb, var(--vm-yellow) 35%, transparent) 0 2px, transparent 2px),
+    linear-gradient(0deg, #161922, #05060a);
+}
+
+.vm-cave.tray .top {
+  background: linear-gradient(180deg, #23262f, #08090d);
+}
+
+.vm-lamp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 60px;
+  translate: 0 0 -4px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.vm-glass {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.08) 0 16%, transparent 16% 38%, rgba(255, 255, 255, 0.05) 38% 44%, transparent 44%),
+    linear-gradient(180deg, rgba(0, 240, 255, 0.04), transparent 30%);
+}
+
+/* 진열칸: 캔은 유리 뒤 38px에 서 있고, 그 아래로 선반 바닥이 안쪽까지 뻗는다 */
+.vm-item {
+  background: transparent;
+}
+
+.vm-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 70px;            /* 위 여백 12px + 캔 높이 58px = 캔 바닥 */
+  height: 78px;
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(0, 0, 0, 0.45) 9px 11px),
+    linear-gradient(180deg, #2e3342, #0d0f15);
+  box-shadow: inset 0 2px 0 rgba(0, 240, 255, 0.45);
+  pointer-events: none;
+}
+
+.vm-shelf .vm-can {
+  transform: translateZ(-38px);
+}
+
+.vm-item:hover:not(:disabled) .vm-shelf .vm-can,
+.vm-item:hover:not(:disabled) .vm-can {
+  transform: translate3d(0, -4px, -38px);
+}
+
+.vm-cyl {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* 원통 옆면 12장. 너비와 회전은 인라인으로 받는다 */
+.vm-cyl-side {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 58px;
+  margin-left: -4.583px;
+  background-repeat: no-repeat, repeat-x;
+  backface-visibility: hidden;
+}
+
+.vm-cyl-cap {
+  position: absolute;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.vm-cyl-cap.top {
+  top: -17px;
+  transform: rotateX(90deg);
+  background:
+    radial-gradient(ellipse 18% 9% at 50% 38%, #8a90a0 0 70%, transparent 75%),
+    radial-gradient(ellipse 12% 6% at 50% 66%, #1e2128 0 70%, transparent 75%),
+    radial-gradient(circle at 42% 38%, #f1f3f7, #a3a9b6 55%, #dde1e8 74%, #6d7384 80%, #b9bfcb 92%, #5c6170);
+}
+
+.vm-cyl-cap.bottom {
+  top: 41px;
+  transform: rotateX(-90deg);
+  background: radial-gradient(circle, #5c6170, #2a2d36);
+}
+
+.vm-item:hover:not(:disabled) .vm-cyl,
+.vm-item:focus-visible .vm-cyl {
+  animation: vm-cyl-spin 2.6s linear infinite;
+}
+
+/* 나선 코일: 캔 아래쪽을 감은 고리가 안쪽으로 이어진다 */
+.vm-coil3d {
+  position: absolute;
+  left: 50%;
+  top: 56px;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.vm-coil3d i {
+  position: absolute;
+  left: -21px;
+  top: -21px;
+  width: 42px;
+  height: 42px;
+  border: 1.6px solid #b8bfcf;
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(0, 240, 255, 0.5);
+}
+
+.vm-coil3d i:nth-child(1) { transform: translateZ(-6px) rotateY(8deg); }
+.vm-coil3d i:nth-child(2) { transform: translateZ(-20px) rotateY(8deg); }
+.vm-coil3d i:nth-child(3) { transform: translateZ(-34px) rotateY(8deg); border-color: #8d93a1; }
+.vm-coil3d i:nth-child(4) { transform: translateZ(-48px) rotateY(8deg); border-color: #6d7384; }
+.vm-coil3d i:nth-child(5) { transform: translateZ(-62px) rotateY(8deg); border-color: #4a5062; }
+
+.vm-item-name {
+  margin-top: 6px;
+}
+
+/* 가격표: 선반 앞 턱 */
 .vm-tag {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 0 #07080b;
 }
 
-/* 키패드: 두께가 있는 키. 누르면 가라앉는다 */
+.vm.is-exploded .vm-shelf {
+  filter: none;
+}
+
+/* 고장 순간의 흔들림: clip-path와 filter는 3D를 평면으로 눌러 버리므로 이동과 깜빡임만 쓴다 */
+.vm.is-broken .vm-shelf {
+  animation: vm-glitch3d 420ms steps(3) 1;
+}
+
+@keyframes vm-glitch3d {
+  0%, 100% { translate: 0 0; opacity: 1; }
+  25% { translate: -4px 1px; opacity: 0.6; }
+  50% { translate: 4px -2px; opacity: 1; }
+  75% { translate: -2px 0; opacity: 0.75; }
+}
+
+.vm.is-exploded .vm-cyl-side,
+.vm.is-exploded .vm-cyl-cap {
+  filter: brightness(0.5) grayscale(0.6);
+}
+
+/* 조작부: 14px 튀어나온 판. 키는 그 위로 6px 솟은 블록이고 누르면 들어간다 */
+.vm-panel {
+  position: relative;
+  --d: 14px;
+  translate: 0 0 14px;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.vm-display {
+  translate: 0 0 1px;
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vm-signal) 22%, transparent), inset 3px 3px 6px rgba(0, 0, 0, 0.9);
+}
+
 .vm-key {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #050608, 0 5px 6px rgba(0, 0, 0, 0.6);
-  transition: translate 80ms ease-out, box-shadow 80ms ease-out;
+  position: relative;
+  --d: 6px;
+  --edge-t: #4a5062;
+  --edge-l: #2a2e3b;
+  translate: 0 0 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: translate 80ms ease-out;
 }
 
 .vm-key:active:not(:disabled) {
-  translate: 0 3px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #050608;
+  translate: 0 0 1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .vm-slots > span {
   box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.8), 1px 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.vm-panel .cp-primary,
+.vm-panel .cp-ghost {
+  translate: 0 0 4px;
+}
+
+.vm-panel .cp-primary:hover:not(:disabled) {
+  translate: 0 0 7px;
+}
+
+.vm-panel .cp-primary:active:not(:disabled),
+.vm-panel .cp-ghost:active:not(:disabled) {
+  translate: 0 0 1px;
+}
+
+/* 꺼내는 곳: 철판 구멍 뒤 52px 깊이의 통. 반투명 덮개가 안쪽으로 기울어 매달려 있다 */
+.vm-tray {
+  translate: 0 0 1px;
+  background: none;
+  box-shadow: none;
+}
+
+.vm-tray.warning {
+  box-shadow: inset 0 -12px 28px rgba(255, 59, 92, 0.2);
+}
+
+.vm-tray-box {
+  background: none;
+}
+
+.vm-flap {
+  transform-origin: top center;
+  rotate: x -32deg;
+}
+
+.vm-tray-empty {
+  translate: 0 0 -52px;
+}
+
 .vm-tray-item {
+  translate: 0 0 6px;
   box-shadow: inset 0 0 12px rgba(243, 255, 26, 0.2), 0 4px 0 #5f6400;
   transition: translate 80ms ease-out, box-shadow 80ms ease-out;
 }
@@ -3143,12 +3557,171 @@ a.budget-button:hover {
 }
 
 .vm-tray-item:active:not(:disabled) {
-  translate: 0 3px;
+  translate: 0 3px 2px;
   box-shadow: inset 0 0 12px rgba(243, 255, 26, 0.2), 0 1px 0 #5f6400;
 }
 
 .vm-tray-item:disabled {
   box-shadow: 0 4px 0 #0b0d12;
+}
+
+.vm-base {
+  translate: 0 0 1px;
+}
+
+/* 지붕 위 통신 안테나 */
+.vm-antenna {
+  position: absolute;
+  top: 0;
+  left: 74%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--vm-depth) * -0.5));
+  transform-origin: 0 0;
+  transition: transform 600ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.vm-ant-base {
+  position: absolute;
+  left: -16px;
+  top: -14px;
+  width: 32px;
+  height: 14px;
+  --d: 32px;
+  --edge-t: #3a3f4f;
+  transform-style: preserve-3d;
+  transform: translateZ(16px);
+  background: linear-gradient(90deg, #2a2e3b, #12141b);
+  box-shadow: inset 0 0 0 1px var(--vm-side-signal);
+}
+
+.vm-ant-mast {
+  position: absolute;
+  left: -2px;
+  top: -96px;
+  width: 4px;
+  height: 82px;
+  background: linear-gradient(90deg, #4a4e5a, #e1e4ea 45%, #5c6170);
+}
+
+.vm-ant-mast.cross {
+  transform: rotateY(90deg);
+}
+
+/* 작은 접시 안테나 */
+.vm-ant-dish {
+  position: absolute;
+  left: -34px;
+  top: -66px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #b8bfcf;
+  background: radial-gradient(circle at 60% 50%, #f1f3f7, #8d93a1 60%, #3b3f49);
+  transform: rotateY(-40deg) rotateX(12deg);
+}
+
+.vm-ant-led {
+  position: absolute;
+  left: -5px;
+  top: -104px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--vm-side-signal);
+  box-shadow: 0 0 10px var(--vm-side-signal), 0 0 22px var(--vm-side-signal);
+  animation: vm-blink 1.4s steps(2) infinite;
+}
+
+/* 퍼져 나가는 신호 고리: 수평으로 누운 원 */
+.vm-ant-ring {
+  position: absolute;
+  left: -24px;
+  top: -123px;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--vm-side-signal);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--vm-side-signal);
+  opacity: 0;
+  animation: vm-ant-wave 2.4s ease-out infinite;
+}
+
+.vm-ant-ring.late { animation-delay: 0.8s; }
+.vm-ant-ring.last { animation-delay: 1.6s; }
+
+.vm-rig.is-hacking .vm-ant-ring { animation-duration: 0.9s; }
+.vm-rig.is-hacking .vm-ant-ring.late { animation-delay: 0.3s; }
+.vm-rig.is-hacking .vm-ant-ring.last { animation-delay: 0.6s; }
+.vm-rig.is-broken .vm-ant-ring { animation-timing-function: steps(5); }
+
+.vm-rig.is-exploded .vm-antenna {
+  transform: translateZ(calc(var(--vm-depth) * -0.5)) rotateZ(34deg) rotateX(-12deg);
+}
+
+.vm-rig.is-exploded .vm-ant-ring,
+.vm-rig.is-exploded .vm-ant-led {
+  display: none;
+}
+
+/* 바닥 그림자와 형광 반사 */
+.vm-stage::after {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 0;
+  bottom: 30px;
+  z-index: -1;
+  height: 60px;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(0, 0, 0, 0.85), transparent 70%),
+    radial-gradient(ellipse at 50% 60%, rgba(0, 240, 255, 0.16), transparent 72%);
+  filter: blur(8px);
+}
+
+.vm-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  margin-top: 18px;
+  color: var(--cp-muted);
+  font-size: 13px;
+  cursor: default;
+}
+
+.vm-view .cp-ghost {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .vm-rig {
+    --vm-depth: 90px;
+  }
+}
+
+@keyframes vm-cyl-spin {
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes vm-ant-wave {
+  0%   { opacity: 0.9; transform: rotateX(90deg) scale(0.2); }
+  100% { opacity: 0; transform: rotateX(90deg) scale(3); }
+}
+
+@keyframes vm-sweep3d {
+  from { transform: translate3d(0, -100%, 3px); }
+  to   { transform: translate3d(0, 340%, 3px); }
+}
+
+@keyframes vm-burst3d {
+  0%   { opacity: 0.4; transform: translateZ(calc(var(--vm-depth) * -1 - 12px)) scale(1); }
+  10%  { opacity: 1; transform: translateZ(calc(var(--vm-depth) * -1 - 12px)) scale(1.5); filter: blur(34px); }
+  100% { opacity: 0.1; transform: translateZ(calc(var(--vm-depth) * -1 - 12px)) scale(1); }
 }
 
 /* 깎은 버튼: clip-path가 바깥 그림자를 자르므로 두께는 안쪽 경사면으로 그린다 */
@@ -3226,18 +3799,92 @@ a.budget-button:hover {
     0 0 26px rgba(243, 230, 0, 0.18);
 }
 
-/* 단계 번호: 작은 정육면체 */
+/* 단계 번호: 진짜 정육면체(앞, 위, 옆 세 면) */
+.cp-steps li {
+  perspective: 320px;
+}
+
 .cp-steps li::before {
+  content: none;
+  display: none;
+}
+
+.cp-cube {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  transform-style: preserve-3d;
+  transform: rotateX(-22deg) rotateY(-32deg);
+}
+
+.cp-cube i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
-  box-shadow: 3px 3px 0 #000, inset 1px 1px 0 rgba(255, 255, 255, 0.08);
+  font-family: var(--cp-display);
+  font-size: 14px;
+  font-style: normal;
 }
 
-.cp-steps li.done::before {
-  box-shadow: 3px 3px 0 #4a4e5a;
+.cp-cube .front { transform: translateZ(14px); }
+.cp-cube .top { transform: rotateX(90deg) translateZ(14px); background: #1f2330; }
+.cp-cube .side { transform: rotateY(90deg) translateZ(14px); background: #0a0b10; }
+
+.cp-steps li.done .cp-cube i {
+  border-color: var(--cp-text);
 }
 
-.cp-steps li.current::before {
-  box-shadow: 3px 3px 0 #7d7600, 0 0 12px rgba(243, 230, 0, 0.4);
+.cp-steps li.current .cp-cube {
+  animation: cp-cube-turn 3.6s ease-in-out infinite;
+}
+
+.cp-steps li.current .cp-cube i {
+  border-color: var(--cp-accent);
+  color: var(--cp-accent-text);
+}
+
+.cp-steps li.current .cp-cube .front { background: var(--cp-accent); box-shadow: 0 0 12px rgba(243, 230, 0, 0.45); }
+.cp-steps li.current .cp-cube .top { background: #fff46a; }
+.cp-steps li.current .cp-cube .side { background: #8f8700; }
+
+@keyframes cp-cube-turn {
+  0%, 100% { transform: rotateX(-22deg) rotateY(-32deg); }
+  50%      { transform: rotateX(-26deg) rotateY(-58deg) translateY(-2px); }
+}
+
+/* 헤더 크레딧의 동전: 앞뒤 두 면이 있는 동전이 천천히 돈다 */
+.cp-credit {
+  perspective: 160px;
+}
+
+.cp-credit-coin {
+  position: relative;
+  background: none;
+  box-shadow: none;
+  transform-style: preserve-3d;
+  animation: cp-coin-spin 3.2s linear infinite;
+}
+
+.cp-credit-coin .face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbb0, #f3e600 55%, #8f8400);
+  box-shadow: 0 0 6px rgba(243, 230, 0, 0.6), inset 0 0 0 1.5px #b3a900;
+  backface-visibility: hidden;
+}
+
+.cp-credit-coin .face.back {
+  transform: rotateY(180deg);
+  background: radial-gradient(circle at 60% 40%, #f3e600, #a69c00 60%, #5f5900);
+}
+
+@keyframes cp-coin-spin {
+  to { transform: rotateY(360deg); }
 }
 
 /* 사이드바: 왼쪽 경첩에 매달린 문처럼 열린다 */
@@ -3269,24 +3916,110 @@ a.budget-button:hover {
   box-shadow: 2px 2px 0 #000;
 }
 
-/* 쓰레기통: 둥근 통과 타원 뚜껑 */
-.cp-trash-lid {
-  height: 12px;
-  border-radius: 31px / 6px;
-  background: radial-gradient(ellipse at 40% 35%, #555b6c, #22252f 70%);
-  box-shadow: 0 3px 0 #0b0c10, 0 0 10px rgba(243, 230, 0, 0.35);
-}
-
-.cp-trash-body {
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.6), transparent 22%, rgba(255, 255, 255, 0.16) 34%, transparent 48%, rgba(0, 0, 0, 0.25) 75%, rgba(0, 0, 0, 0.65)),
-    repeating-linear-gradient(90deg, transparent 0 9px, rgba(0, 0, 0, 0.35) 9px 11px),
-    linear-gradient(180deg, #2a2e3b, #12141b);
-  border-radius: 0 0 8px 8px / 0 0 4px 4px;
-}
-
+/* 쓰레기통: 16장 옆면의 원통 통과 뒤쪽 경첩에 달린 원판 뚜껑. 뒤지면 뚜껑이 들썩 열린다 */
 .cp-trash {
+  perspective: 420px;
   filter: drop-shadow(4px 6px 6px rgba(0, 0, 0, 0.7));
+}
+
+.cp-bin {
+  position: relative;
+  display: block;
+  width: 70px;
+  height: 84px;
+  transform-style: preserve-3d;
+  transform: rotateX(-20deg);
+}
+
+.cp-bin-body {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 0;
+  height: 62px;
+  transform-style: preserve-3d;
+}
+
+.cp-bin-body > i {
+  position: absolute;
+  top: 0;
+  left: -5.17px;
+  width: 10.34px;
+  height: 62px;
+  background-size: 100% 100%, auto;
+  backface-visibility: hidden;
+  box-shadow: inset 0 -6px 0 -3px rgba(243, 230, 0, 0.55);
+}
+
+.cp-bin-body > .cp-bin-hole {
+  left: -25px;
+  top: -25px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  transform: rotateX(90deg) translateZ(-2px);
+  background: radial-gradient(circle, #000 0 55%, #1a1d26 70%, #3a3f4f);
+  box-shadow: none;
+  backface-visibility: visible;
+}
+
+.cp-bin-body > .cp-bin-band {
+  left: -36px;
+  top: 50px;
+  width: 72px;
+  height: 24px;
+  border-radius: 50%;
+  transform: rotateX(90deg);
+  background: radial-gradient(ellipse, rgba(243, 230, 0, 0.35), transparent 70%);
+  box-shadow: none;
+  backface-visibility: visible;
+}
+
+.cp-bin-lid {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(-29px);
+}
+
+/* 뒤쪽 모서리가 경첩: 90°면 닫혀 누워 있고, 커질수록 앞쪽이 들린다 */
+.cp-bin-lid i {
+  position: absolute;
+  left: -30px;
+  top: 0;
+  width: 60px;
+  height: 60px;
+  border: 2px solid var(--cp-accent);
+  border-radius: 50%;
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+  background: radial-gradient(circle at 45% 40%, #5a6072, #22252f 70%);
+  box-shadow: 0 0 10px rgba(243, 230, 0, 0.4), inset 0 0 0 6px rgba(0, 0, 0, 0.25);
+  transition: transform 260ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.cp-trash:hover .cp-bin-lid i,
+.cp-trash:focus-visible .cp-bin-lid i {
+  transform: rotateX(118deg);
+}
+
+.cp-trash.bump-a .cp-bin-lid i {
+  animation: cp-lid3d-a 520ms ease-out;
+}
+
+.cp-trash.bump-b .cp-bin-lid i {
+  animation: cp-lid3d-b 520ms ease-out;
+}
+
+@keyframes cp-lid3d-a {
+  35% { transform: rotateX(196deg); }
+}
+
+@keyframes cp-lid3d-b {
+  35% { transform: rotateX(196deg); }
 }
 
 /* 배경 깊이: 앞쪽 파형일수록 포인터를 따라 더 많이 움직이고, 캔 더미는 가장 뒤에서 조금만 움직인다 */
@@ -3476,6 +4209,15 @@ a.budget-button:hover {
   .vm.is-broken .vm-shelf,
   .vm.is-broken .vm-led,
   .vm-cursor,
+  .vm-cyl,
+  .vm-item:hover:not(:disabled) .vm-cyl,
+  .vm-item:focus-visible .vm-cyl,
+  .vm-ant-ring,
+  .vm-ant-led,
+  .cp-cube,
+  .cp-steps li.current .cp-cube,
+  .cp-credit-coin,
+  .cp-trash .cp-bin-lid i,
   .vm-can-art,
   .vm-item:hover:not(:disabled) .vm-can-art,
   .vm-item:focus-visible .vm-can-art,
@@ -3504,6 +4246,7 @@ a.budget-button:hover {
   }
 
   .vm-tilt,
+  .vm-tilt.is-resetting,
   .cp-field-wave,
   .cp-pile,
   .dmg,

@@ -1183,6 +1183,7 @@ test("자판기: 캔은 진열칸 그 자리에서 곧장 아래로, 중력처�
   const { page, doc } = await brokenMachine();
   // 동작 줄이기를 끄고 배출해야 애니메이션이 붙는다
   page.win.matchMedia = (() => ({ matches: false })) as unknown as typeof page.win.matchMedia;
+  await wait(450);   // 고장 순간 진열칸이 흔들리는 동안은 캔 자리가 잠깐 어긋난다
   $(doc, '[data-drink="midnight"]').click();
   await wait();
   const can = $(doc, ".vm-tray-can");
@@ -1200,7 +1201,7 @@ test("자판기: 캔은 진열칸 그 자리에서 곧장 아래로, 중력처�
   // 자판기가 3D로 기울어 있어도 진열칸 캔 자리에서 출발한다
   const tilted = center($(doc, '[data-drink="midnight"] .vm-can').getBoundingClientRect());
   const start = sample(0);
-  assert.ok(Math.abs(start.x - tilted.x) < 1.5 && Math.abs(start.y - tilted.y) < 1.5, "기울어진 자판기에서도 진열칸에서 출발해야 합니다.");
+  assert.ok(Math.abs(start.x - tilted.x) < 1.5 && Math.abs(start.y - tilted.y) < 1.5, `기울어진 자판기에서도 진열칸에서 출발해야 합니다. 캔 ${start.x.toFixed(1)},${start.y.toFixed(1)} 진열칸 ${tilted.x.toFixed(1)},${tilted.y.toFixed(1)}`);
 
   // 낙하 궤적은 원근 없이 정면에서 잰다
   const tilt = $(doc, ".vm-tilt");
@@ -1223,6 +1224,45 @@ test("자판기: 캔은 진열칸 그 자리에서 곧장 아래로, 중력처�
 
   animation.finish();
   await until(() => doc.querySelector("#vm-take:not(:disabled)") !== null, "애니메이션이 끝나면 꺼낼 수 있어야 합니다.");
+  page.frame.remove();
+});
+
+test("자판기: 누른 채 끌면 3D 자판기가 돌고, 끈 뒤의 클릭은 음료를 누르지 않으며, 정면 보기로 돌아온다", async () => {
+  const page = await openPage("./index.html");
+  const { doc, win } = page;
+  win.matchMedia = (() => ({ matches: true })) as unknown as typeof win.matchMedia;   // 관성 없이 바로 멈춘다
+  const stage = $(doc, ".vm-stage");
+  const tilt = $(doc, ".vm-tilt");
+  const item = $(doc, '[data-drink="chrome-cola"]');
+  const angle = () => Number.parseFloat(tilt.style.getPropertyValue("--vm-ry"));
+  const before = angle();
+  const pointer = (type: string, target: Element, x: number, y: number) =>
+    target.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 7, button: 0, clientX: x, clientY: y }));
+
+  // 마우스 위치만으로는 돌지 않는다
+  pointer("pointermove", stage, 10, 10);
+  assert.equal(angle(), before);
+
+  pointer("pointerdown", item, 300, 300);
+  pointer("pointermove", item, 340, 300);
+  pointer("pointermove", item, 400, 300);
+  pointer("pointerup", item, 400, 300);
+  item.click();   // 끌기를 마치며 생기는 클릭
+  await wait();
+  assert.ok(Math.abs(angle() - (before + 45)) < 0.01, `각도 ${angle()}`);
+  assert.equal(item.classList.contains("picked"), false, "끈 뒤의 클릭으로 음료를 누르면 안 됩니다.");
+
+  // 조금만 움직인 클릭은 그대로 누른다 (끌기 직후 0.1초 동안만 클릭을 막는다)
+  await wait(150);
+  pointer("pointerdown", item, 300, 300);
+  pointer("pointermove", item, 302, 301);
+  pointer("pointerup", item, 302, 301);
+  item.click();
+  await wait();
+  assert.ok(item.classList.contains("picked"), "그냥 누르면 음료를 고른다.");
+
+  $(doc, "#vm-view-reset").click();
+  assert.equal(angle(), before);
   page.frame.remove();
 });
 

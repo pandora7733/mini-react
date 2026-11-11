@@ -416,7 +416,7 @@ function Header({ menuOpen, balance, wreck, onToggleMenu }: {
         ))}
       </nav>
       <span id="cp-credit" className="cp-credit dmg" style={damaged(OFFSETS.credit, wreck)}>
-        <span className="cp-credit-coin" aria-hidden="true" />
+        <span className="cp-credit-coin" aria-hidden="true"><i className="face" /><i className="face back" /></span>
         {won(balance)} 크레딧
       </span>
     </header>
@@ -461,6 +461,11 @@ function Steps({ current, wreck }: { current: number; wreck: Wreck }) {
           style={damaged(STEP_OFFSETS[index], wreck)}
           aria-current={index === current ? "step" : undefined}
         >
+          <span className="cp-cube" aria-hidden="true">
+            <i className="front">{index < current ? "✓" : String(index + 1)}</i>
+            <i className="top" />
+            <i className="side" />
+          </span>
           {label}
         </li>
       ))}
@@ -607,15 +612,125 @@ function CanPile({ pile, width }: { pile: PileCan[]; width: number }) {
   );
 }
 
-// 진열칸의 나선 코일 (정면에서 본 모습)
-function Coil() {
+// --- 3D 부품 ---
+// 자판기 앞면(유리)이 z=0이고 안쪽이 음수다. 진열칸 캔은 유리 뒤 SHELF_Z에, 꺼내는 곳의 캔은 TRAY_Z에 선다.
+const SHELF_Z = -38;
+const TRAY_Z = -26;
+const CYL_SIDES = 12;
+const CYL_LABEL = 110;                                             // 펼친 라벨 너비(px)
+const CYL_FACE = CYL_LABEL / CYL_SIDES;                            // 옆면 한 장의 너비
+const CYL_RADIUS = CYL_FACE / (2 * Math.tan(Math.PI / CYL_SIDES)); // 옆면까지의 거리(≈17px, 캔 지름 34px)
+
+// 원통 옆면의 밝기. 빛은 물체 기준 왼쪽 앞에서 온다
+function cylinderShade(angle: number): string {
+  const rad = (angle * Math.PI) / 180;
+  const light = -0.55 * Math.sin(rad) + 0.83 * Math.cos(rad);
+  const dark = (0.78 * (1 - Math.max(0, light))).toFixed(2);
+  // 하이라이트도 같은 한 겹에 넣어 겹 수(배경 크기, 반복 목록)가 옆면마다 같게 한다
+  const shine = light > 0.9 ? ((light - 0.9) * 4.5).toFixed(2) : "0";
+  return `linear-gradient(90deg, rgba(0, 0, 0, ${dark}), rgba(255, 255, 255, ${shine}) 50%, rgba(0, 0, 0, ${dark}))`;
+}
+
+// 캔 라벨을 펼친 그림. 가운데(55)가 정면이다
+const labelCache = new Map<string, string>();
+function canLabel(drink: Drink): string {
+  const cached = labelCache.get(drink.id);
+  if (cached) return cached;
+  const [dark, main, light] = drink.can.match(/#[0-9a-f]{6}/gi)!;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CYL_LABEL}" height="58">`
+    + `<rect width="${CYL_LABEL}" height="58" fill="${main}"/>`
+    + `<path d="M30 42 L52 13 L60 13 L38 42 Z" fill="${light}" opacity="0.5"/>`
+    + `<rect y="15" width="${CYL_LABEL}" height="1" fill="${light}" opacity="0.8"/>`
+    + `<circle cx="62" cy="25" r="6" fill="none" stroke="${light}" stroke-width="1.8"/><circle cx="62" cy="25" r="2" fill="${light}"/>`
+    + `<text x="55" y="42" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="9" fill="#fff">${drink.code}</text>`
+    + `<text x="0" y="34" font-family="sans-serif" font-weight="700" font-size="6" fill="${light}">NV24</text>`
+    + `<rect y="45" width="${CYL_LABEL}" height="4" fill="${dark}"/>`
+    + `<rect width="${CYL_LABEL}" height="7" fill="#c9ced8"/><rect y="6" width="${CYL_LABEL}" height="1.5" fill="#6d7384"/>`
+    + `<rect y="53" width="${CYL_LABEL}" height="5" fill="#9aa0ae"/><rect y="53" width="${CYL_LABEL}" height="1" fill="#e6e9f0"/>`
+    + `</svg>`;
+  const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  labelCache.set(drink.id, url);
+  return url;
+}
+
+// 진짜 원통 캔: 열두 장의 옆면에 라벨을 나눠 붙이고 위아래를 원판으로 막는다
+function Cylinder({ drink }: { drink: Drink }) {
+  const label = canLabel(drink);
   return (
-    <svg className="vm-coil" viewBox="0 0 60 14" aria-hidden="true">
-      <path className="back" d="M0 7 Q5 13 10 7 T20 7 T30 7 T40 7 T50 7 T60 7" />
-      <path className="front" d="M0 7 Q5 1 10 7 T20 7 T30 7 T40 7 T50 7 T60 7" />
-    </svg>
+    <span className="vm-cyl">
+      {Array.from({ length: CYL_SIDES }, (_, index) => {
+        const angle = (360 / CYL_SIDES) * index;
+        const offset = -(CYL_LABEL / 2 - CYL_FACE / 2 + index * CYL_FACE);
+        return (
+          <i
+            key={index}
+            className="vm-cyl-side"
+            style={{
+              width: `${CYL_FACE.toFixed(3)}px`,
+              transform: `rotateY(${angle}deg) translateZ(${CYL_RADIUS.toFixed(3)}px)`,
+              backgroundImage: `${cylinderShade(angle)}, ${label}`,
+              backgroundSize: `100% 100%, ${CYL_LABEL}px 100%`,
+              backgroundPosition: `0 0, ${offset.toFixed(3)}px 0`,
+            }}
+          />
+        );
+      })}
+      <i className="vm-cyl-cap top" />
+      <i className="vm-cyl-cap bottom" />
+    </span>
   );
 }
+
+// 두께: 앞면에서 뒤로 뻗는 네 옆면. 부모의 --d가 깊이다
+function Edges() {
+  return (
+    <span className="vm-edges" aria-hidden="true">
+      <i className="t" />
+      <i className="b" />
+      <i className="l" />
+      <i className="r" />
+    </span>
+  );
+}
+
+// 진열칸의 나선 코일: 캔을 감싼 고리가 안쪽으로 이어진다
+function Coil3D() {
+  return (
+    <span className="vm-coil3d" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map(index => <i key={index} />)}
+    </span>
+  );
+}
+
+// 안쪽 공간의 다섯 벽(뒤, 왼쪽, 오른쪽, 위, 아래)
+function Cave({ className }: { className: string }) {
+  return (
+    <span className={`vm-cave ${className}`} aria-hidden="true">
+      <i className="back" />
+      <i className="left" />
+      <i className="right" />
+      <i className="top" />
+      <i className="bottom" />
+    </span>
+  );
+}
+
+// 지붕 위 통신 안테나: 신호 고리가 퍼져 나간다
+function Antenna() {
+  return (
+    <div className="vm-antenna" aria-hidden="true">
+      <span className="vm-ant-base"><Edges /></span>
+      <span className="vm-ant-mast" />
+      <span className="vm-ant-mast cross" />
+      <span className="vm-ant-dish" />
+      <span className="vm-ant-led" />
+      <span className="vm-ant-ring" />
+      <span className="vm-ant-ring late" />
+      <span className="vm-ant-ring last" />
+    </div>
+  );
+}
+
 
 // 폭발 파편과 유리 조각. 매번 같은 모양이 나오도록 고정된 씨앗으로 만든다
 const SHARDS = (() => {
@@ -734,19 +849,24 @@ function VendingMachine(props: {
   const stateLabel = exploded ? "파손" : broken ? "고장" : machine === "hacking" ? "침입 감지" : "정상 영업";
 
   return (
-    // 3D 캐비닛: 무대(원근) > 기울기(마우스) > 몸체(파손 변위). 몸체 안에 옆면, 윗면과 앞면(vm-frame)이 있다.
-    // 앞면의 바깥 두 겹은 번지는 형광 빛(vm-frame)과 형광 테두리(vm-edge). 깎은 모서리 때문에 테두리를 겹으로 만든다
-    <div className="vm-stage">
+    // 3D 캐비닛: 무대(원근) > 회전(끌기) > 몸체(파손 변위). 몸체 안에 여섯 면과 지붕 안테나, 앞면(vm-frame)이 있다.
+    // 앞면은 구멍 뚫린 철판(vm-bezel) 하나이고, 유리창과 꺼내는 곳 구멍 뒤로 안쪽 공간이 들어가 있다
+    <div className="vm-stage" title="드래그해서 돌려 보세요">
      <div className="vm-tilt">
       <div className={`vm-rig dmg is-${machine}`} style={damaged(OFFSETS.machine, wreck)}>
       <span className="vm-face vm-face-left" aria-hidden="true" />
       <span className="vm-face vm-face-right" aria-hidden="true" />
       <span className="vm-face vm-face-top" aria-hidden="true" />
+      <span className="vm-face vm-face-bottom" aria-hidden="true" />
+      <span className="vm-face vm-face-back" aria-hidden="true"><b>NIGHT VEND 24</b></span>
+      <Antenna />
     <div className={`vm-frame is-${machine}${warning ? " is-warning" : ""}`}>
       <div className="vm-edge">
         <section id="vending" className={`vm is-${machine}`} aria-label="자판기">
-          {/* 위쪽 조명 간판 */}
+          <span className="vm-bezel" aria-hidden="true" />
+          {/* 위쪽 조명 간판: 앞으로 튀어나온 빛 상자 */}
           <div className="vm-sign dmg" style={damaged(OFFSETS.sign, wreck)}>
+            <Edges />
             <div className="vm-top">
               <span className="vm-name">NIGHT VEND 24</span>
               <span className="vm-led" aria-hidden="true" />
@@ -758,6 +878,8 @@ function VendingMachine(props: {
           <div className="vm-body">
             {/* 유리창 안의 진열칸 */}
             <div className="vm-window">
+              <Cave className="window" />
+              <span className="vm-lamp" aria-hidden="true" />
               <ul className="vm-shelf" aria-label="음료 목록">
                 {DRINKS.map(drink => (
                   <li key={drink.id}>
@@ -769,8 +891,9 @@ function VendingMachine(props: {
                       aria-label={`${drink.code} ${drink.name}, ${broken ? "0" : won(drink.price)} 크레딧`}
                       onClick={() => props.onSelect(drink)}
                     >
-                      <span className="vm-can" aria-hidden="true"><Can3D drink={drink} /></span>
-                      <Coil />
+                      <span className="vm-floor" aria-hidden="true" />
+                      <span className="vm-can" aria-hidden="true"><Cylinder drink={drink} /></span>
+                      <Coil3D />
                       <span className="vm-item-name">{drink.name}</span>
                       <span className="vm-tag">
                         <span className="vm-code">{drink.code}</span>
@@ -789,6 +912,7 @@ function VendingMachine(props: {
 
             {/* 오른쪽 조작부 */}
             <div className="vm-panel">
+              <Edges />
               <p id="vm-display" className="vm-display" role="status" aria-live="polite">
                 <span id="vm-display-text">{display}</span>
                 <span className="vm-cursor" aria-hidden="true" />
@@ -809,10 +933,12 @@ function VendingMachine(props: {
                     disabled={machine === "hacking" || exploded}
                     onClick={() => props.onKey(key)}
                   >
+                    <Edges />
                     {key}
                   </button>
                 ))}
                 <button className="vm-key wide" type="button" data-key="CLR" disabled={machine === "hacking" || exploded} onClick={() => props.onKey("CLR")}>
+                  <Edges />
                   CLR
                 </button>
               </div>
@@ -872,6 +998,7 @@ function VendingMachine(props: {
               <span id="vm-load" className="vm-load">적재 {count}/{TRAY_CAPACITY}</span>
             </div>
             <div id="vm-tray-box" className="vm-tray-box" aria-label={`꺼내는 곳의 캔 ${count}개`}>
+              <Cave className="tray" />
               <span className="vm-flap dmg" style={damaged(OFFSETS.flap, wreck)} aria-hidden="true" />
               {trayCans.map(can => {
                 const drink = DRINKS.find(item => item.id === can.drinkId)!;
@@ -886,7 +1013,7 @@ function VendingMachine(props: {
                     style={{
                       left: `calc(${can.x.toFixed(2)}% - ${CAN_W / 2}px)`,
                       bottom: `${(can.y + height / 2 - CAN_H / 2).toFixed(1)}px`,
-                      transform: `rotate(${can.rot}deg)`,
+                      transform: `translateZ(${TRAY_Z}px) rotate(${can.rot}deg)`,
                     }}
                   >
                     <Can3D drink={drink} />
@@ -911,6 +1038,10 @@ function VendingMachine(props: {
     </div>
       </div>
      </div>
+      <div className="vm-view">
+        <button id="vm-view-reset" className="cp-ghost" type="button" onClick={() => resetView?.()}>정면 보기</button>
+        <span>자판기를 끌어서 돌려 보세요</span>
+      </div>
     </div>
   );
 }
@@ -952,8 +1083,22 @@ function TrashCan({ popups, bumps, message, wreck, onRummage }: {
         aria-label="쓰레기통 뒤지기. 100 크레딧 단위로 동전을 주울 수 있습니다"
         onClick={onRummage}
       >
-        <span className="cp-trash-lid" aria-hidden="true" />
-        <span className="cp-trash-body" aria-hidden="true" />
+        <span className="cp-bin" aria-hidden="true">
+          <span className="cp-bin-body">
+            {Array.from({ length: 16 }, (_, index) => (
+              <i
+                key={index}
+                style={{
+                  transform: `rotateY(${index * 22.5}deg) translateZ(26px)`,
+                  backgroundImage: `${cylinderShade(index * 22.5)}, repeating-linear-gradient(180deg, #2a2e3b 0 9px, #1a1d26 9px 11px)`,
+                }}
+              />
+            ))}
+            <i className="cp-bin-hole" />
+            <i className="cp-bin-band" />
+          </span>
+          <span className="cp-bin-lid"><i /></span>
+        </span>
         <span className="cp-trash-label">뒤지기</span>
         {popups.map(popup => (
           <span key={popup.key} className="cp-trash-pop" aria-hidden="true">+{won(popup.amount)}</span>
@@ -1061,8 +1206,13 @@ function centerOf(element: Element): { x: number; y: number } {
 
 // 레이아웃 좌표(변환 전)로 잰 중심. 자판기는 3D로 기울어 있어 화면 좌표의 차이를 앞면 안의 이동으로 쓰면 어긋난다
 function layoutCenter(element: HTMLElement, root: HTMLElement): { x: number; y: number } {
-  let x = element.offsetWidth / 2;
-  let y = element.offsetHeight / 2;
+  const origin = layoutOrigin(element, root);
+  return { x: origin.x + element.offsetWidth / 2, y: origin.y + element.offsetHeight / 2 };
+}
+
+function layoutOrigin(element: HTMLElement, root: HTMLElement): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
   let node: HTMLElement | null = element;
   while (node !== null && node !== root) {
     x += node.offsetLeft;
@@ -1075,6 +1225,140 @@ function layoutCenter(element: HTMLElement, root: HTMLElement): { x: number; y: 
     }
   }
   return { x, y };
+}
+
+let resetView: (() => void) | null = null;   // 정면 보기 버튼이 부른다. 끌기 컨트롤러가 채운다
+
+const VIEW_RX = -10;   // 처음 보는 각도: 살짝 위에서, 왼쪽 옆면이 보이게
+const VIEW_RY = 22;
+
+// 자판기 돌리기: 누른 채 끌면 돌고, 놓으면 관성으로 조금 더 돌다 멈춘다.
+// 6px 넘게 끌었을 때만 돌리기로 보고, 그때 생기는 click은 막아 버튼이 눌리지 않게 한다
+function dragMachine(): () => void {
+  const stage = document.querySelector<HTMLElement>(".vm-stage");
+  const tilt = document.querySelector<HTMLElement>(".vm-tilt");
+  if (stage === null || tilt === null) return () => undefined;
+  let rx = VIEW_RX;
+  let ry = VIEW_RY;
+  let speedX = 0;
+  let speedY = 0;
+  let frame = 0;
+  let resetTimer = 0;
+  let suppressUntil = 0;
+  let dragging = false;
+  let start: { id: number; x: number; y: number; rx: number; ry: number } | null = null;
+  let last = { x: 0, y: 0, t: 0 };
+  const clampX = (value: number) => Math.max(-60, Math.min(40, value));
+  const apply = () => {
+    tilt.style.setProperty("--vm-rx", `${rx.toFixed(2)}deg`);
+    tilt.style.setProperty("--vm-ry", `${ry.toFixed(2)}deg`);
+  };
+  apply();
+
+  const onDown = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+    cancelAnimationFrame(frame);
+    start = { id: event.pointerId, x: event.clientX, y: event.clientY, rx, ry };
+    last = { x: event.clientX, y: event.clientY, t: performance.now() };
+    dragging = false;
+    speedX = 0;
+    speedY = 0;
+  };
+  const onMove = (event: PointerEvent) => {
+    if (start === null || event.pointerId !== start.id) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!dragging) {
+      if (Math.hypot(dx, dy) < 6) return;
+      dragging = true;
+      try {
+        stage.setPointerCapture(event.pointerId);   // 자판기 밖으로 끌어도 계속 돌린다
+      } catch {
+        // 이미 끝난 포인터면 붙잡지 못해도 돌리기는 이어진다
+      }
+      stage.classList.add("is-dragging");
+      tilt.classList.remove("is-resetting");
+    }
+    // 관성 속도(도/ms). 이벤트가 몰려 와도 튀지 않게 시간 간격과 최고 속도를 제한한다
+    const now = performance.now();
+    const dt = Math.max(12, now - last.t);
+    const limit = (value: number) => Math.max(-0.5, Math.min(0.5, value));
+    speedY = limit(((event.clientX - last.x) * 0.45) / dt);
+    speedX = limit((-(event.clientY - last.y) * 0.35) / dt);
+    last = { x: event.clientX, y: event.clientY, t: now };
+    ry = start.ry + dx * 0.45;
+    rx = clampX(start.rx - dy * 0.35);
+    apply();
+  };
+  const onUp = (event: PointerEvent) => {
+    if (start === null || event.pointerId !== start.id) return;
+    const moved = dragging;
+    start = null;
+    dragging = false;
+    stage.classList.remove("is-dragging");
+    if (!moved) return;
+    suppressUntil = performance.now() + 100;
+    if (reducedMotion() || performance.now() - last.t > 80) return;   // 멈췄다 놓으면 관성이 없다
+    let previous = performance.now();
+    const coast = (now: number) => {
+      const dt = now - previous;
+      previous = now;
+      ry += speedY * dt;
+      rx = clampX(rx + speedX * dt);
+      const decay = Math.pow(0.9, dt / 16);
+      speedX *= decay;
+      speedY *= decay;
+      apply();
+      if (Math.abs(speedX) + Math.abs(speedY) > 0.003) frame = requestAnimationFrame(coast);
+    };
+    frame = requestAnimationFrame(coast);
+  };
+  const onClick = (event: MouseEvent) => {
+    if (performance.now() < suppressUntil) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+  };
+  stage.addEventListener("pointerdown", onDown);
+  stage.addEventListener("pointermove", onMove);
+  stage.addEventListener("pointerup", onUp);
+  stage.addEventListener("pointercancel", onUp);
+  stage.addEventListener("click", onClick, true);
+  resetView = () => {
+    cancelAnimationFrame(frame);
+    tilt.classList.add("is-resetting");
+    rx = VIEW_RX;
+    ry = VIEW_RY + 360 * Math.round((ry - VIEW_RY) / 360);   // 가까운 쪽으로 돌아온다
+    apply();
+    clearTimeout(resetTimer);
+    resetTimer = window.setTimeout(() => tilt.classList.remove("is-resetting"), 800);
+  };
+  return () => {
+    cancelAnimationFrame(frame);
+    clearTimeout(resetTimer);
+    stage.removeEventListener("pointerdown", onDown);
+    stage.removeEventListener("pointermove", onMove);
+    stage.removeEventListener("pointerup", onUp);
+    stage.removeEventListener("pointercancel", onUp);
+    stage.removeEventListener("click", onClick, true);
+    resetView = null;
+  };
+}
+
+// 앞면 철판에 유리창과 꺼내는 곳 구멍을 뚫는다. 구멍 위치는 레이아웃이 바뀔 때마다 다시 잰다
+function fitBezel(): void {
+  const vm = document.getElementById("vending");
+  if (vm === null) return;
+  const holes: Array<[string, HTMLElement | null]> = [["win", vm.querySelector<HTMLElement>(".vm-window")], ["tray", document.getElementById("vm-tray-box")]];
+  for (const [name, element] of holes) {
+    if (element === null) continue;
+    const origin = layoutOrigin(element, vm);
+    // 철판은 .vm보다 2px 크게(테두리) 그려지므로 그만큼 민다
+    vm.style.setProperty(`--${name}-x`, `${origin.x + element.clientLeft + 2}px`);
+    vm.style.setProperty(`--${name}-y`, `${origin.y + element.clientTop + 2}px`);
+    vm.style.setProperty(`--${name}-w`, `${element.clientWidth}px`);
+    vm.style.setProperty(`--${name}-h`, `${element.clientHeight}px`);
+  }
 }
 
 function animateFall(can: TrayCan): Promise<void> {
@@ -1126,7 +1410,9 @@ function animateFall(can: TrayCan): Promise<void> {
       }
       y = impactY * (1 - tip) - hop;
     }
-    frames.push({ offset: time / total, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${rot.toFixed(1)}deg)` });
+    // 진열칸 깊이에서 곧장 떨어지고, 바닥에 닿은 뒤 꺼내는 곳 깊이로 굴러 나온다
+    const z = time <= fallTime ? SHELF_Z : SHELF_Z + (TRAY_Z - SHELF_Z) * easeOutQuad(Math.min(1, (time - fallTime) / rollTime));
+    frames.push({ offset: time / total, transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px) rotate(${rot.toFixed(1)}deg)` });
     if (time === total) break;
   }
 
@@ -1234,16 +1520,18 @@ function blastCans(): void {
     const vy = Math.min(-0.5, Math.sin(angle) * speed) - Math.random() * 0.6;   // 항상 위로 솟구친다
     const spin = (Math.random() - 0.5) * 2.4;
     const duration = 1700 + Math.random() * 600;
+    const baseZ = element.classList.contains("vm-tray-can") ? TRAY_Z : SHELF_Z;
     const frames: Keyframe[] = [];
     for (let t = 0; t <= duration; t += FRAME_MS * 2) {
       const x = vx * t;
       const y = vy * t + 0.5 * GRAVITY * 0.7 * t * t;
-      const scale = 1 + Math.min(0.6, t / 2000);   // 화면 쪽으로 튀어나오는 느낌
+      const z = baseZ + Math.min(t, 1400) * 0.2;   // 유리를 뚫고 화면 쪽으로 튀어나온다
+      const scale = 1;   // 화면 쪽으로 튀어나오는 크기 변화는 원근(z)이 만든다
       const fade = t > duration * 0.75 ? 1 - (t - duration * 0.75) / (duration * 0.25) : 1;
       frames.push({
         offset: t / duration,
         opacity: Math.max(0, fade),
-        transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(baseRot + spin * t).toFixed(1)}deg) scale(${scale.toFixed(2)})`,
+        transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px) rotate(${(baseRot + spin * t).toFixed(1)}deg) scale(${scale.toFixed(2)})`,
       });
     }
     frames[frames.length - 1] = { ...frames[frames.length - 1], offset: 1, opacity: 0 };
@@ -1299,6 +1587,13 @@ export function Home() {
       root.style.setProperty("--cp-py", ((event.clientY / window.innerHeight) * 2 - 1).toFixed(3));
     };
     window.addEventListener("pointermove", onPointer);
+    const stopDrag = dragMachine();
+    // 앞면 구멍은 글꼴이 늦게 로드되거나 내용이 바뀌어 크기가 달라질 때도 다시 맞춘다
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fitBezel) : null;
+    for (const selector of ["#vending", ".vm-window", "#vm-tray-box"]) {
+      const element = document.querySelector(selector);
+      if (element) observer?.observe(element);
+    }
     let link = document.getElementById(FONT_ID);
     if (link === null) {
       const created = document.createElement("link");
@@ -1312,12 +1607,19 @@ export function Home() {
     return () => {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onPointer);
+      stopDrag();
+      observer?.disconnect();
       root.style.removeProperty("--cp-px");
       root.style.removeProperty("--cp-py");
       document.body.classList.remove("cp-body", "cp-menu-open");
       fonts.remove();
     };
   }, []);
+
+  // 매번 그린 뒤 앞면 구멍 위치를 맞춘다(그리기 전에 실행되어 구멍이 늦게 뚫리지 않는다)
+  useEffect(() => {
+    fitBezel();
+  });
 
   // 해킹은 단계마다 잠깐씩 멈추며 진행하고, 마지막 단계가 끝나면 자판기가 고장 난다
   useEffect(() => {
