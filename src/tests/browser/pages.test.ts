@@ -1052,9 +1052,9 @@ test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 �
   await wait();
   assert.equal($(doc, "#vm-taken").textContent, String(ids.length));
 
-  // 꺼낸 캔은 배경 전자기파 뒤로 7배 크기가 되어 화면 바닥에 쌓인다. 넘치면 오래된 캔부터 덜어 낸다
+  // 꺼낸 캔은 배경 전자기파 뒤로 7배 크기가 되어 화면 바닥에 쌓인다
   const pile = Array.from(doc.querySelectorAll<HTMLElement>(".cp-pile-can"));
-  assert.ok(pile.length >= 1 && pile.length <= ids.length, `더미 ${pile.length}개`);
+  assert.equal(pile.length, ids.length, "꺼낸 만큼 모두 쌓인다.");
   assert.equal(pile[0].offsetWidth, 34 * 7);
   assert.equal(pile[0].offsetHeight, 58 * 7);
   const layer = page.win.getComputedStyle($(doc, ".cp-pile")).zIndex;
@@ -1062,6 +1062,18 @@ test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 �
   assert.ok(Number(layer) < Number(field), "전자기파보다 뒤에 있어야 합니다.");
   const floor = Math.min(...pile.map(can => Number.parseFloat(can.style.bottom) + 58 * 7 / 2 - can.getBoundingClientRect().height / 2));
   assert.ok(Math.abs(floor) < 1, "가장 아래 캔은 화면 바닥에 닿아 있어야 합니다.");
+
+  // 한도 없이 계속 쌓이며, 화면 위로 넘어가도 그대로 둔다
+  for (let round = 0; round < 3; round++) {
+    $(doc, "#vm-random").click();
+    await idle();
+    $(doc, "#vm-take").click();
+    await wait();
+  }
+  const total = Number($(doc, "#vm-taken").textContent);
+  assert.equal(doc.querySelectorAll(".cp-pile-can").length, total);
+  const pileTop = Math.min(...Array.from(doc.querySelectorAll(".cp-pile-can"), can => can.getBoundingClientRect().top));
+  assert.ok(pileTop < 0, `${total}개면 화면 위로 넘어가야 합니다.`);
   page.frame.remove();
 });
 
@@ -1069,6 +1081,13 @@ test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지�
   const { page, doc, idle } = await brokenMachine();
   const ids = ["chrome-cola", "neon-cider", "synapse", "midnight", "lemonade", "blackout"];
   assert.ok($(doc, ".cp").classList.contains("is-alert"), "해킹하면 배경 전자기장이 빨갛게 바뀐다.");
+
+  // 배경 더미를 먼저 만들어 둔다
+  $(doc, "#vm-random").click();
+  await idle();
+  $(doc, "#vm-take").click();
+  await wait();
+  assert.ok(doc.querySelectorAll(".cp-pile-can").length > 0);
 
   for (let i = 0; i < 24; i++) $(doc, `[data-drink="${ids[i % ids.length]}"]`).click();
   await idle();
@@ -1085,6 +1104,7 @@ test("자판기: 꺼내는 곳에 30개를 넘게 담으면 자판기가 터지�
   assert.equal(doc.querySelector("#vm-take"), null, "터지면 꺼낼 수 없습니다.");
   assert.equal(($(doc, '[data-drink="synapse"]') as HTMLButtonElement).disabled, true);
   assert.equal($(doc, "#vm-lost").textContent, "31");
+  assert.equal(doc.querySelectorAll(".cp-pile-can").length, 0, "터지면 배경 더미가 무너져 사라진다.");
 
   // 2차 피해: 화면 전체가 부서진다
   await until(() => doc.querySelector("#cp-wreck:not(.breaking)") !== null, "화면이 부서지지 않았습니다.");

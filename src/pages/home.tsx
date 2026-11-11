@@ -156,10 +156,9 @@ function placeCan(existing: TrayCan[], width: number): { x: number; y: number; r
 
 // --- 배경의 캔 더미 ---
 // 꺼낸 캔은 배경 전자기파 뒤로 7배 크기가 되어 떨어져 화면 바닥에 쌓인다.
-// 자리는 캔마다 정해진 난수로 매번 다시 계산하므로, 오래된 캔을 덜어 내면 남은 더미가 그만큼 가라앉는다.
+// 한도 없이 계속 위로 쌓이며, 화면 위로 넘어간 캔도 그대로 둔다. 자판기가 터지면 더미 전체가 아래로 무너져 사라진다.
 
 const PILE_SCALE = 7;
-const PILE_MAX_HEIGHT = 0.95;   // 더미가 화면 높이의 이 비율을 넘으면 가장 오래된 캔부터 덜어 낸다
 
 interface PileCan {
   key: number;
@@ -199,16 +198,6 @@ function layoutPile(pile: PileCan[], width: number): PileSpot[] {
     spots.push(best);
   }
   return spots;
-}
-
-function trimPile(pile: PileCan[], width: number, height: number): PileCan[] {
-  let list = pile;
-  while (list.length > 1) {
-    const top = Math.max(...layoutPile(list, width).map(spot => spot.y + spot.h));
-    if (top <= height * PILE_MAX_HEIGHT) break;
-    list = list.slice(1);
-  }
-  return list;
 }
 
 // --- 파형 ---
@@ -1131,7 +1120,8 @@ function animatePileFall(can: PileCan): void {
   const element = document.querySelector<HTMLElement>(`[data-pile-key="${can.key}"]`);
   if (element === null || typeof element.animate !== "function") return;
   const rect = element.getBoundingClientRect();
-  const startY = -(rect.bottom + 60);   // 캔 전체가 화면 위로 숨은 곳에서 출발한다
+  // 캔 전체가 화면 위로 숨은 곳에서 출발한다. 이미 화면 위에 놓일 캔도 그 위에서 떨어진다
+  const startY = -Math.max(600, rect.bottom + 60);
   const drift = (Math.random() - 0.5) * 160;
   const spin = (Math.random() < 0.5 ? -1 : 1) * randomInt(90, 220);
   const fallTime = Math.sqrt((2 * -startY) / GRAVITY);
@@ -1169,6 +1159,37 @@ function animatePileFall(can: PileCan): void {
       { duration: 260 },
     );
   }, can.delay + fallTime);
+}
+
+// 자판기가 터지면 배경 더미가 흔들리다 바닥 아래로 무너져 내린다. 끝나는 시간을 돌려준다
+function collapsePile(): number {
+  let longest = 0;
+  document.querySelectorAll<HTMLElement>(".cp-pile-can").forEach(element => {
+    if (typeof element.animate !== "function") return;
+    const rect = element.getBoundingClientRect();
+    const rot = Number(element.dataset.rot ?? 0);
+    const drop = window.innerHeight - rect.top + 80;   // 캔 윗면까지 화면 아래로 빠진다
+    const drift = (Math.random() - 0.5) * 240;
+    const spin = (Math.random() - 0.5) * 120;
+    const delay = 200 + Math.random() * 350;            // 폭발 충격이 닿은 뒤 제각각 무너진다
+    // 화면 위 높이 쌓인 캔도 같은 시간 안에 빠지도록 가속을 키운다
+    const duration = Math.min(1400, Math.max(700, Math.sqrt((2 * drop) / GRAVITY)));
+    const frames: Keyframe[] = [];
+    for (let t = 0; t <= duration + FRAME_MS; t += FRAME_MS) {
+      const time = Math.min(t, duration);
+      const progress = time / duration;
+      const shake = time < 120 ? Math.sin(time / 12) * 6 : 0;
+      const y = Math.min(drop, 0.5 * GRAVITY * time * time * (drop / (0.5 * GRAVITY * duration * duration)));
+      frames.push({
+        offset: progress,
+        transform: `translate(${(drift * progress + shake).toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(rot + spin * progress).toFixed(1)}deg)`,
+      });
+      if (time === duration) break;
+    }
+    element.animate(frames, { duration, delay, easing: "linear", fill: "forwards" });
+    longest = Math.max(longest, delay + duration);
+  });
+  return longest;
 }
 
 // 폭발: 꺼내는 곳과 진열칸의 캔이 폭심에서 바깥으로 튕겨 나가 화면 밖까지 포물선을 그리며 날아간다
@@ -1307,7 +1328,13 @@ export function Home() {
     const center = frame ? centerOf(frame) : { x: innerWidth / 2, y: innerHeight / 2 };
     setOrigin({ x: center.x, y: center.y, w: innerWidth, h: innerHeight });
     setWreckPhase("breaking");
-    if (!reducedMotion()) blastCans();
+    if (reducedMotion()) {
+      setPile([]);
+      return;
+    }
+    blastCans();
+    // 수리가 먼저 끝나도 무너진 캔은 치워야 하므로 타이머를 취소하지 않는다
+    setTimeout(() => setPile([]), collapsePile() + 50);
   }, [machine]);
 
   useEffect(() => {
@@ -1451,7 +1478,7 @@ export function Home() {
     });
     // 꺼낸 만큼 배경 뒤로 거대한 캔이 떨어져 쌓인다
     const fresh = trayCans.map((can, index) => ({ key: nextKey++, drinkId: can.drinkId, rot: pileRot(), delay: index * 140 }));
-    setPile(prev => trimPile([...prev, ...fresh], window.innerWidth, window.innerHeight));
+    setPile(prev => [...prev, ...fresh]);
     setTrayCans([]);
     setNotice(null);
   };
