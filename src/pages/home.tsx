@@ -120,11 +120,11 @@ function reducedMotion(): boolean {
 // --- 꺼내는 곳의 캔 배치 ---
 
 // 회전한 캔이 화면에서 차지하는 너비와 높이
-function footprint(rot: number): { w: number; h: number } {
+function footprint(rot: number, scale = 1): { w: number; h: number } {
   const rad = (rot * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
   const sin = Math.abs(Math.sin(rad));
-  return { w: cos * CAN_W + sin * CAN_H, h: sin * CAN_W + cos * CAN_H };
+  return { w: (cos * CAN_W + sin * CAN_H) * scale, h: (sin * CAN_W + cos * CAN_H) * scale };
 }
 
 // 이 위치에 놓으면 아래 캔 위에 얹혀 바닥에서 얼마나 뜨는지
@@ -152,6 +152,63 @@ function placeCan(existing: TrayCan[], width: number): { x: number; y: number; r
     if (y < best.y) best = { center, y };
   }
   return { x: (best.center / width) * 100, y: best.y, rot };
+}
+
+// --- 배경의 캔 더미 ---
+// 꺼낸 캔은 배경 전자기파 뒤로 7배 크기가 되어 떨어져 화면 바닥에 쌓인다.
+// 자리는 캔마다 정해진 난수로 매번 다시 계산하므로, 오래된 캔을 덜어 내면 남은 더미가 그만큼 가라앉는다.
+
+const PILE_SCALE = 7;
+const PILE_MAX_HEIGHT = 0.95;   // 더미가 화면 높이의 이 비율을 넘으면 가장 오래된 캔부터 덜어 낸다
+
+interface PileCan {
+  key: number;
+  drinkId: string;
+  rot: number;
+  delay: number;
+}
+
+interface PileSpot {
+  center: number;   // 화면 왼쪽에서 캔 중심까지(px)
+  y: number;        // 바닥에서 캔이 차지하는 영역의 아래쪽까지(px)
+  w: number;
+  h: number;
+}
+
+function pileRot(): number {
+  if (Math.random() < 0.3) return randomInt(-6, 6);
+  return (Math.random() < 0.5 ? -1 : 1) * (90 + randomInt(-14, 14));
+}
+
+function layoutPile(pile: PileCan[], width: number): PileSpot[] {
+  const spots: PileSpot[] = [];
+  for (const can of pile) {
+    const { w, h: height } = footprint(can.rot, PILE_SCALE);
+    const random = seeded((can.key * 48271) % 2147483647 || 1);
+    random();
+    let best: PileSpot = { center: w / 2, y: Infinity, w, h: height };
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const center = w / 2 + random() * Math.max(0, width - w);
+      let y = 0;
+      for (const spot of spots) {
+        const overlap = Math.min(center + w / 2, spot.center + spot.w / 2) - Math.max(center - w / 2, spot.center - spot.w / 2);
+        if (overlap > 12 * PILE_SCALE) y = Math.max(y, spot.y + spot.h - 8 * PILE_SCALE);
+      }
+      if (y < best.y) best = { center, y, w, h: height };
+    }
+    spots.push(best);
+  }
+  return spots;
+}
+
+function trimPile(pile: PileCan[], width: number, height: number): PileCan[] {
+  let list = pile;
+  while (list.length > 1) {
+    const top = Math.max(...layoutPile(list, width).map(spot => spot.y + spot.h));
+    if (top <= height * PILE_MAX_HEIGHT) break;
+    list = list.slice(1);
+  }
+  return list;
 }
 
 // --- 파형 ---
@@ -529,6 +586,35 @@ function Can3D({ drink, tiny = false }: { drink: Drink; tiny?: boolean }) {
       <ellipse cx="17" cy="4.3" rx="3.4" ry="1.3" fill="#b4bac6" stroke="#5c6170" stroke-width="0.5" />
       <ellipse cx="17" cy="6.4" rx="2.4" ry="0.8" fill="#23262e" />
     </svg>
+  );
+}
+
+function CanPile({ pile, width }: { pile: PileCan[]; width: number }) {
+  const spots = layoutPile(pile, width);
+  return (
+    <div className="cp-pile" aria-hidden="true">
+      {pile.map((can, index) => {
+        const drink = DRINKS.find(item => item.id === can.drinkId)!;
+        const spot = spots[index];
+        const canW = CAN_W * PILE_SCALE;
+        const canH = CAN_H * PILE_SCALE;
+        return (
+          <span
+            key={can.key}
+            className="cp-pile-can"
+            data-pile-key={can.key}
+            data-rot={can.rot}
+            style={{
+              left: `${(spot.center - canW / 2).toFixed(1)}px`,
+              bottom: `${(spot.y + spot.h / 2 - canH / 2).toFixed(1)}px`,
+              transform: `rotate(${can.rot}deg)`,
+            }}
+          >
+            <Can3D drink={drink} />
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1040,6 +1126,51 @@ function animateFall(can: TrayCan): Promise<void> {
   return Promise.race([animation.finished.then(() => undefined, () => clearTimeout(thud)), deadline]);
 }
 
+// 꺼낸 캔: 화면 위 밖에서 빙글 돌며 떨어져 더미 위 자리에 두 번 튀고 멈춘다
+function animatePileFall(can: PileCan): void {
+  const element = document.querySelector<HTMLElement>(`[data-pile-key="${can.key}"]`);
+  if (element === null || typeof element.animate !== "function") return;
+  const rect = element.getBoundingClientRect();
+  const startY = -(rect.bottom + 60);   // 캔 전체가 화면 위로 숨은 곳에서 출발한다
+  const drift = (Math.random() - 0.5) * 160;
+  const spin = (Math.random() < 0.5 ? -1 : 1) * randomInt(90, 220);
+  const fallTime = Math.sqrt((2 * -startY) / GRAVITY);
+  const hop1Speed = GRAVITY * fallTime * RESTITUTION * 0.6;   // 무거워서 덜 튄다
+  const hop1Time = (2 * hop1Speed) / GRAVITY;
+  const hop2Speed = hop1Speed * RESTITUTION;
+  const hop2Time = (2 * hop2Speed) / GRAVITY;
+  const total = fallTime + hop1Time + hop2Time;
+  const frames: Keyframe[] = [];
+  for (let t = 0; t <= total + FRAME_MS; t += FRAME_MS) {
+    const time = Math.min(t, total);
+    let x = 0;
+    let y = 0;
+    let rot = can.rot;
+    if (time <= fallTime) {
+      const progress = time / fallTime;
+      x = drift * (1 - progress);
+      y = startY + 0.5 * GRAVITY * time * time;
+      rot = can.rot - spin * (1 - progress);
+    } else {
+      const after = time - fallTime;
+      const second = after - hop1Time;
+      if (after < hop1Time) y = -(hop1Speed * after - 0.5 * GRAVITY * after * after);
+      else y = -(hop2Speed * second - 0.5 * GRAVITY * second * second);
+      rot = can.rot + Math.sin(after / 40) * 3 * (1 - after / (total - fallTime));
+    }
+    frames.push({ offset: time / total, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${rot.toFixed(1)}deg)` });
+    if (time === total) break;
+  }
+  element.animate(frames, { duration: total, delay: can.delay, easing: "linear", fill: "backwards" });
+  // 떨어질 때 배경 전자기장이 한 번 출렁인다
+  setTimeout(() => {
+    document.querySelector(".cp-field")?.animate(
+      [{ transform: "translateY(0)" }, { transform: "translateY(6px)" }, { transform: "translateY(-2px)" }, { transform: "translateY(0)" }],
+      { duration: 260 },
+    );
+  }, can.delay + fallTime);
+}
+
 // 폭발: 꺼내는 곳과 진열칸의 캔이 폭심에서 바깥으로 튕겨 나가 화면 밖까지 포물선을 그리며 날아간다
 function blastCans(): void {
   const origin = document.getElementById("vm-tray-box");
@@ -1078,6 +1209,7 @@ function blastCans(): void {
 let menuTouched = false;   // 첫 렌더에서 메뉴 버튼으로 포커스를 옮기지 않기 위한 표시
 let nextKey = 1;
 const animatedCans = new Set<number>();   // 이미 떨어뜨린 캔. 다시 그려도 애니메이션을 반복하지 않는다
+const animatedPile = new Set<number>();
 
 export function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1100,6 +1232,8 @@ export function Home() {
   const [repairs, setRepairs] = useState(0);
   const [sparks, setSparks] = useState<Array<{ key: number; x: number; y: number }>>([]);
   const [repairedKey, setRepairedKey] = useState(0);
+  const [pile, setPile] = useState<PileCan[]>([]);
+  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   // 이 페이지에서만 쓰는 글꼴과 배경이므로 들어올 때 붙이고 떠날 때 뗀다
   useEffect(() => {
@@ -1107,6 +1241,9 @@ export function Home() {
     document.body.classList.add("cp-body");
     menuTouched = false;
     animatedCans.clear();
+    animatedPile.clear();
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
     let link = document.getElementById(FONT_ID);
     if (link === null) {
       const created = document.createElement("link");
@@ -1118,6 +1255,7 @@ export function Home() {
     }
     const fonts = link;
     return () => {
+      window.removeEventListener("resize", onResize);
       document.body.classList.remove("cp-body", "cp-menu-open");
       fonts.remove();
     };
@@ -1145,6 +1283,14 @@ export function Home() {
     }
     Promise.all(fresh.map(animateFall)).then(() => setFalling(n => n - fresh.length));
   }, [trayCans]);
+
+  // 꺼낸 캔 중 새로 더미에 들어온 것만 떨어뜨린다
+  useEffect(() => {
+    const fresh = pile.filter(can => !animatedPile.has(can.key));
+    for (const can of fresh) animatedPile.add(can.key);
+    if (fresh.length === 0 || reducedMotion()) return;
+    fresh.forEach(animatePileFall);
+  }, [pile]);
 
   // 마지막 캔까지 떨어졌을 때 적재 한계를 넘었으면 터진다
   const overloaded = trayCans.length > TRAY_CAPACITY;
@@ -1303,6 +1449,9 @@ export function Home() {
       for (const can of trayCans) next[can.drinkId] = (next[can.drinkId] ?? 0) + 1;
       return next;
     });
+    // 꺼낸 만큼 배경 뒤로 거대한 캔이 떨어져 쌓인다
+    const fresh = trayCans.map((can, index) => ({ key: nextKey++, drinkId: can.drinkId, rot: pileRot(), delay: index * 140 }));
+    setPile(prev => trimPile([...prev, ...fresh], window.innerWidth, window.innerHeight));
     setTrayCans([]);
     setNotice(null);
   };
@@ -1344,6 +1493,7 @@ export function Home() {
   return (
     <div className={`cp ${field}${wreck.breaking ? " is-breaking" : ""}`}>
       <CanDefs />
+      <CanPile pile={pile} width={viewport.w} />
       <Field />
       <Header menuOpen={menuOpen} balance={balance} wreck={wreck} onToggleMenu={toggleMenu} />
       <Sidebar open={menuOpen} onClose={closeMenu} />

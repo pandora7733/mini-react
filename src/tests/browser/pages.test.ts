@@ -1051,6 +1051,17 @@ test("자판기: 랜덤 대량 배출은 아무 칸에서나 캔 여러 개를 �
   $(doc, "#vm-take").click();
   await wait();
   assert.equal($(doc, "#vm-taken").textContent, String(ids.length));
+
+  // 꺼낸 캔은 배경 전자기파 뒤로 7배 크기가 되어 화면 바닥에 쌓인다. 넘치면 오래된 캔부터 덜어 낸다
+  const pile = Array.from(doc.querySelectorAll<HTMLElement>(".cp-pile-can"));
+  assert.ok(pile.length >= 1 && pile.length <= ids.length, `더미 ${pile.length}개`);
+  assert.equal(pile[0].offsetWidth, 34 * 7);
+  assert.equal(pile[0].offsetHeight, 58 * 7);
+  const layer = page.win.getComputedStyle($(doc, ".cp-pile")).zIndex;
+  const field = page.win.getComputedStyle($(doc, ".cp-field")).zIndex;
+  assert.ok(Number(layer) < Number(field), "전자기파보다 뒤에 있어야 합니다.");
+  const floor = Math.min(...pile.map(can => Number.parseFloat(can.style.bottom) + 58 * 7 / 2 - can.getBoundingClientRect().height / 2));
+  assert.ok(Math.abs(floor) < 1, "가장 아래 캔은 화면 바닥에 닿아 있어야 합니다.");
   page.frame.remove();
 });
 

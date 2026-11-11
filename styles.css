@@ -1250,6 +1250,34 @@ a.budget-button:hover {
   animation: vm-pulse 4s ease-in-out infinite;
 }
 
+/* 꺼낸 캔 더미: 검은 바탕 위, 전자기파 아래에 7배 크기로 쌓인다 */
+.cp-pile {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.62;
+  transition: opacity 400ms ease-out;
+}
+
+.cp-pile-can {
+  position: absolute;
+  width: 238px;
+  height: 406px;
+  will-change: transform;
+  /* 오래된 캔을 덜어 내면 남은 더미가 가라앉는다 */
+  transition: left 900ms cubic-bezier(0.5, 0, 0.75, 0), bottom 900ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+.cp-pile-can .vm-can-3d {
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.85));
+}
+
+.cp.is-wrecked .cp-pile {
+  opacity: 0.35;
+}
+
 @keyframes cp-field-flow {
   to { transform: translateX(-1600px); }
 }
@@ -3162,6 +3190,7 @@ a.budget-button:hover {
   .cp-sidebar.open,
   .cp-scrim,
   .vm-can,
+  .cp-pile-can,
   .vm-progress-fill,
   .cp-nav-link::after,
   .cp-crack,
