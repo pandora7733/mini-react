@@ -462,6 +462,76 @@ function EmWave({ machine }: { machine: Machine }) {
   );
 }
 
+// 3D 캔이 함께 쓰는 금속 결, 원통 음영, 뚜껑 그라디언트. 페이지에 한 번만 둔다
+function CanDefs() {
+  return (
+    <svg className="vm-can-defs" width="0" height="0" aria-hidden="true">
+      <defs>
+        <linearGradient id="vm-can-metal" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#3b3f49" />
+          <stop offset="0.28" stop-color="#c9ced8" />
+          <stop offset="0.36" stop-color="#f4f6fa" />
+          <stop offset="0.62" stop-color="#8d93a1" />
+          <stop offset="1" stop-color="#2e3139" />
+        </linearGradient>
+        {/* 왼쪽 위에서 빛이 오는 원통: 가장자리는 어둡고, 왼쪽 1/3에 하이라이트가 선다 */}
+        <linearGradient id="vm-can-shade" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#000" stop-opacity="0.7" />
+          <stop offset="0.12" stop-color="#000" stop-opacity="0.25" />
+          <stop offset="0.24" stop-color="#fff" stop-opacity="0" />
+          <stop offset="0.31" stop-color="#fff" stop-opacity="0.6" />
+          <stop offset="0.38" stop-color="#fff" stop-opacity="0" />
+          <stop offset="0.68" stop-color="#000" stop-opacity="0.08" />
+          <stop offset="0.88" stop-color="#000" stop-opacity="0.45" />
+          <stop offset="1" stop-color="#000" stop-opacity="0.75" />
+        </linearGradient>
+        <radialGradient id="vm-can-lid" cx="0.45" cy="0.4" r="0.6">
+          <stop offset="0" stop-color="#e8ebf1" />
+          <stop offset="0.55" stop-color="#9ba1af" />
+          <stop offset="0.8" stop-color="#d7dbe3" />
+          <stop offset="1" stop-color="#5c6170" />
+        </radialGradient>
+        {/* 라벨 영역: 위아래 경계가 원통 둘레를 따라 아래로 휜다 */}
+        <clipPath id="vm-can-label">
+          <path d="M0 13 A17 4 0 0 0 34 13 L34 48 A17 4 0 0 1 0 48 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
+// 위에서 살짝 내려다본 원통형 캔. 라벨 무늬만 옆으로 흘러가 캔이 도는 것처럼 보인다
+function Can3D({ drink, tiny = false }: { drink: Drink; tiny?: boolean }) {
+  const [dark, main, light] = drink.can.match(/#[0-9a-f]{6}/gi)!;
+  const body = "M3 5 L0 11 L0 53 A17 4 0 0 0 34 53 L34 11 L31 5 Z";
+  return (
+    <svg className="vm-can-3d" viewBox="0 -1 34 59" aria-hidden="true">
+      <path d={body} fill="url(#vm-can-metal)" />
+      <g clip-path="url(#vm-can-label)">
+        <rect x="0" y="8" width="34" height="46" fill={main} />
+        {/* 한 바퀴(34) 간격으로 같은 무늬를 세 벌 두고, 돌릴 때 -34만큼 옮긴다 */}
+        <g className="vm-can-art">
+          {[-34, 0, 34].map(offset => (
+            <g key={offset} transform={`translate(${offset} 0)`}>
+              <path d="M-4 31 L10 17 L16 17 L2 31 Z" fill={light} opacity="0.55" />
+              <circle cx="22" cy="24" r="5" fill="none" stroke={light} stroke-width="1.6" />
+              <circle cx="22" cy="24" r="1.8" fill={light} />
+              {!tiny && <text x="17" y="41" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" font-family="Chakra Petch, sans-serif">{drink.code}</text>}
+            </g>
+          ))}
+        </g>
+        <path d="M0 16 A17 4 0 0 0 34 16" fill="none" stroke={light} stroke-width="1" opacity="0.8" />
+        <path d="M0 45 A17 4 0 0 0 34 45" fill="none" stroke={dark} stroke-width="3.5" />
+      </g>
+      <path d={body} fill="url(#vm-can-shade)" />
+      <ellipse cx="17" cy="5" rx="14" ry="3.6" fill="url(#vm-can-lid)" />
+      <ellipse cx="17" cy="5.2" rx="11.6" ry="2.7" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="0.8" />
+      <ellipse cx="17" cy="4.3" rx="3.4" ry="1.3" fill="#b4bac6" stroke="#5c6170" stroke-width="0.5" />
+      <ellipse cx="17" cy="6.4" rx="2.4" ry="0.8" fill="#23262e" />
+    </svg>
+  );
+}
+
 // 진열칸의 나선 코일 (정면에서 본 모습)
 function Coil() {
   return (
@@ -620,7 +690,7 @@ function VendingMachine(props: {
                       aria-label={`${drink.code} ${drink.name}, ${broken ? "0" : won(drink.price)} 크레딧`}
                       onClick={() => props.onSelect(drink)}
                     >
-                      <span className="vm-can" style={{ background: drink.can }} aria-hidden="true" />
+                      <span className="vm-can" aria-hidden="true"><Can3D drink={drink} /></span>
                       <Coil />
                       <span className="vm-item-name">{drink.name}</span>
                       <span className="vm-tag">
@@ -738,9 +808,10 @@ function VendingMachine(props: {
                       left: `calc(${can.x.toFixed(2)}% - ${CAN_W / 2}px)`,
                       bottom: `${(can.y + height / 2 - CAN_H / 2).toFixed(1)}px`,
                       transform: `rotate(${can.rot}deg)`,
-                      background: drink.can,
                     }}
-                  />
+                  >
+                    <Can3D drink={drink} />
+                  </span>
                 );
               })}
               {count === 0 && !exploded && <span className="vm-tray-empty">비어 있음</span>}
@@ -772,7 +843,7 @@ function Bag({ taken, lost }: { taken: Record<string, number>; lost: number }) {
         <ul className="vm-bag-list" aria-label="꺼낸 음료">
           {DRINKS.filter(drink => taken[drink.id]).map(drink => (
             <li key={drink.id}>
-              <span className="vm-can tiny" style={{ background: drink.can }} aria-hidden="true" />
+              <span className="vm-can tiny" aria-hidden="true"><Can3D drink={drink} tiny /></span>
               {drink.name} <span className="vm-bag-count">{taken[drink.id]}</span>
             </li>
           ))}
@@ -1272,6 +1343,7 @@ export function Home() {
 
   return (
     <div className={`cp ${field}${wreck.breaking ? " is-breaking" : ""}`}>
+      <CanDefs />
       <Field />
       <Header menuOpen={menuOpen} balance={balance} wreck={wreck} onToggleMenu={toggleMenu} />
       <Sidebar open={menuOpen} onClose={closeMenu} />
